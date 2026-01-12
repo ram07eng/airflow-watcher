@@ -37,15 +37,51 @@ class AirflowWatcherPlugin(AirflowPlugin):
     # Menu items
     appbuilder_menu_items = [
         {
-            "name": "DAG Monitor",
+            "name": "Dashboard",
             "category": "Watcher",
             "category_icon": "fa-eye",
             "href": "/watcher/dashboard",
+        },
+        {
+            "name": "DAG Failures",
+            "category": "Watcher",
+            "category_icon": "fa-eye",
+            "href": "/watcher/failures",
         },
         {
             "name": "SLA Tracker",
             "category": "Watcher",
             "category_icon": "fa-eye",
             "href": "/watcher/sla",
+        },
+        {
+            "name": "Task Health",
+            "category": "Watcher",
+            "category_icon": "fa-eye",
+            "href": "/watcher/tasks",
+        },
+        {
+            "name": "Scheduling",
+            "category": "Watcher",
+            "category_icon": "fa-eye",
+            "href": "/watcher/scheduling",
+        },
+        {
+            "name": "DAG Health",
+            "category": "Watcher",
+            "category_icon": "fa-eye",
+            "href": "/watcher/dag-health",
+        },
+        {
+            "name": "Dependencies",
+            "category": "Watcher",
+            "category_icon": "fa-eye",
+            "href": "/watcher/dependencies",
+        },
+        {
+            "name": "Health Overview",
+            "category": "Watcher",
+            "category_icon": "fa-eye",
+            "href": "/watcher/health",
         },
     ]

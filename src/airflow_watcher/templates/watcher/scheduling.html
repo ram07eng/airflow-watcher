@@ -1,0 +1,272 @@
+{% extends "airflow/main.html" %}
+
+{% block title %}Scheduling Monitor{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+    .watcher-page { padding: 20px; }
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-card.danger { border-top: 4px solid #d32f2f; }
+    .stat-card.warning { border-top: 4px solid #ff9800; }
+    .stat-card.success { border-top: 4px solid #4caf50; }
+    .stat-card.info { border-top: 4px solid #2196f3; }
+    .stat-value { font-size: 2em; font-weight: bold; }
+    .stat-label { color: #666; font-size: 0.9em; margin-top: 5px; }
+    .section { 
+        background: white; 
+        border-radius: 8px; 
+        padding: 20px; 
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .section h2 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .data-table th, .data-table td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+    .data-table th { background: #f5f5f5; font-weight: 600; }
+    .data-table tr:hover { background: #fafafa; }
+    .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: 500;
+    }
+    .badge-danger { background: #ffebee; color: #d32f2f; }
+    .badge-warning { background: #fff3e0; color: #e65100; }
+    .badge-success { background: #e8f5e9; color: #2e7d32; }
+    .badge-info { background: #e3f2fd; color: #1565c0; }
+    .dag-link { color: #1976d2; text-decoration: none; }
+    .dag-link:hover { text-decoration: underline; }
+    .empty-state { text-align: center; padding: 40px; color: #666; }
+    .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .grid-2col { grid-template-columns: 1fr; } }
+    .pool-bar {
+        width: 100%;
+        height: 20px;
+        background: #e0e0e0;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .pool-bar-fill {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s;
+    }
+    .pool-bar-fill.low { background: #4caf50; }
+    .pool-bar-fill.medium { background: #ff9800; }
+    .pool-bar-fill.high { background: #d32f2f; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="watcher-page">
+    <h1>📅 Scheduling Monitor</h1>
+    
+    <div class="stats-row">
+        <div class="stat-card info">
+            <div class="stat-value">{{ queue_status.total_waiting }}</div>
+            <div class="stat-label">Tasks Waiting</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-value">{{ "%.1f"|format(scheduling_lag.lag_stats.avg_minutes) if scheduling_lag.lag_stats else 0 }}</div>
+            <div class="stat-label">Avg Lag (min)</div>
+        </div>
+        <div class="stat-card danger">
+            <div class="stat-value">{{ scheduling_lag.delayed_count if scheduling_lag.delayed_count else 0 }}</div>
+            <div class="stat-label">Delayed DAGs</div>
+        </div>
+        <div class="stat-card success">
+            <div class="stat-value">{{ concurrent_runs.dags_with_concurrent_runs }}</div>
+            <div class="stat-label">Concurrent Runs</div>
+        </div>
+    </div>
+
+    <div class="grid-2col">
+        <!-- Pool Utilization -->
+        <div class="section">
+            <h2>🏊 Pool Utilization</h2>
+            {% if pools %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Pool</th>
+                        <th>Usage</th>
+                        <th>Running</th>
+                        <th>Queued</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pool in pools %}
+                    <tr>
+                        <td><strong>{{ pool.pool_name }}</strong></td>
+                        <td style="width: 150px;">
+                            <div class="pool-bar">
+                                <div class="pool-bar-fill {{ 'high' if pool.utilization_percent >= 90 else ('medium' if pool.utilization_percent >= 60 else 'low') }}"
+                                     style="width: {{ pool.utilization_percent }}%"></div>
+                            </div>
+                            <small>{{ pool.utilization_percent }}%</small>
+                        </td>
+                        <td>{{ pool.running }} / {{ pool.slots }}</td>
+                        <td>
+                            {% if pool.queued > 0 %}
+                            <span class="badge badge-warning">{{ pool.queued }}</span>
+                            {% else %}
+                            0
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">No pool data available</div>
+            {% endif %}
+        </div>
+
+        <!-- Queue Status -->
+        <div class="section">
+            <h2>📋 Task Queue</h2>
+            <p><strong>Queued:</strong> {{ queue_status.queued_count }} | <strong>Scheduled:</strong> {{ queue_status.scheduled_count }}</p>
+            {% if queue_status.queued_tasks %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>DAG / Task</th>
+                        <th>Wait Time</th>
+                        <th>Pool</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in queue_status.queued_tasks[:10] %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('Airflow.graph', dag_id=task.dag_id) }}" class="dag-link">{{ task.dag_id }}</a><br>
+                            <code>{{ task.task_id }}</code>
+                        </td>
+                        <td>
+                            {% if task.wait_minutes %}
+                            <span class="badge {{ 'badge-danger' if task.wait_minutes > 30 else ('badge-warning' if task.wait_minutes > 10 else 'badge-info') }}">
+                                {{ "%.1f"|format(task.wait_minutes) }} min
+                            </span>
+                            {% else %}
+                            N/A
+                            {% endif %}
+                        </td>
+                        <td>{{ task.pool or 'default' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">✅ No tasks in queue</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Scheduling Lag -->
+    <div class="section">
+        <h2>⏰ Scheduling Lag Analysis (24h)</h2>
+        {% if scheduling_lag.lag_stats %}
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f"|format(scheduling_lag.lag_stats.p50_minutes) }}</div>
+                <div class="stat-label">P50 Lag (min)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f"|format(scheduling_lag.lag_stats.p90_minutes) }}</div>
+                <div class="stat-label">P90 Lag (min)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f"|format(scheduling_lag.lag_stats.max_minutes) }}</div>
+                <div class="stat-label">Max Lag (min)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f"|format(scheduling_lag.delay_rate) }}%</div>
+                <div class="stat-label">Delay Rate</div>
+            </div>
+        </div>
+        
+        {% if scheduling_lag.delayed_dags %}
+        <h3>Most Delayed DAGs</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>DAG</th>
+                    <th>Scheduled</th>
+                    <th>Actual Start</th>
+                    <th>Lag</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dag in scheduling_lag.delayed_dags[:10] %}
+                <tr>
+                    <td><a href="{{ url_for('Airflow.graph', dag_id=dag.dag_id) }}" class="dag-link">{{ dag.dag_id }}</a></td>
+                    <td>{{ dag.scheduled_time }}</td>
+                    <td>{{ dag.actual_start }}</td>
+                    <td><span class="badge badge-warning">{{ "%.1f"|format(dag.lag_minutes) }} min</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% else %}
+        <div class="empty-state">No scheduling data available</div>
+        {% endif %}
+    </div>
+
+    <!-- Stale DAGs -->
+    <div class="section">
+        <h2>😴 Stale DAGs (not run in 24h)</h2>
+        {% if stale_dags %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>DAG</th>
+                    <th>Last Run</th>
+                    <th>Hours Since</th>
+                    <th>Schedule</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dag in stale_dags[:15] %}
+                <tr>
+                    <td><a href="{{ url_for('Airflow.graph', dag_id=dag.dag_id) }}" class="dag-link">{{ dag.dag_id }}</a></td>
+                    <td>{{ dag.last_run or 'Never' }}</td>
+                    <td>
+                        {% if dag.hours_since_run %}
+                        <span class="badge badge-warning">{{ "%.1f"|format(dag.hours_since_run) }}h</span>
+                        {% else %}
+                        <span class="badge badge-danger">Never run</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ dag.schedule_interval or 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">✅ All DAGs are running on schedule</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
