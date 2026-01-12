@@ -1,0 +1,208 @@
+{% extends "airflow/main.html" %}
+
+{% block title %}DAG Failures{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+    .watcher-page {
+        padding: 20px;
+    }
+    .filters {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .filters label {
+        font-weight: 500;
+    }
+    .filters select, .filters input {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    .filters button {
+        background: #1976d2;
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .filters button:hover {
+        background: #1565c0;
+    }
+    .stats-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .stat-box {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-box .value {
+        font-size: 1.8em;
+        font-weight: bold;
+        color: #d32f2f;
+    }
+    .stat-box .label {
+        color: #666;
+        font-size: 0.85em;
+    }
+    .failures-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .failures-table th, .failures-table td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+    .failures-table th {
+        background: #f5f5f5;
+        font-weight: 600;
+    }
+    .failures-table tr:hover {
+        background: #fafafa;
+    }
+    .task-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .task-list li {
+        padding: 3px 0;
+    }
+    .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: 500;
+    }
+    .badge-danger {
+        background: #ffebee;
+        color: #d32f2f;
+    }
+    .dag-link {
+        color: #1976d2;
+        text-decoration: none;
+    }
+    .dag-link:hover {
+        text-decoration: underline;
+    }
+    .expand-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #1976d2;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="watcher-page">
+    <h1>🚨 DAG Failures</h1>
+    
+    <!-- Filters -->
+    <form class="filters" method="GET">
+        <label>DAG ID:</label>
+        <input type="text" name="dag_id" value="{{ filters.dag_id or '' }}" placeholder="Filter by DAG ID">
+        
+        <label>Lookback:</label>
+        <select name="hours">
+            <option value="6" {{ 'selected' if filters.hours == 6 }}>6 hours</option>
+            <option value="12" {{ 'selected' if filters.hours == 12 }}>12 hours</option>
+            <option value="24" {{ 'selected' if filters.hours == 24 }}>24 hours</option>
+            <option value="48" {{ 'selected' if filters.hours == 48 }}>48 hours</option>
+            <option value="168" {{ 'selected' if filters.hours == 168 }}>7 days</option>
+        </select>
+        
+        <button type="submit">Apply Filters</button>
+    </form>
+
+    <!-- Stats Summary -->
+    <div class="stats-summary">
+        <div class="stat-box">
+            <div class="value">{{ stats.failed_runs }}</div>
+            <div class="label">Failed Runs</div>
+        </div>
+        <div class="stat-box">
+            <div class="value">{{ stats.total_task_failures }}</div>
+            <div class="label">Task Failures</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" style="color: #4caf50;">{{ stats.success_runs }}</div>
+            <div class="label">Successful Runs</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" style="color: #ff9800;">{{ "%.1f"|format(stats.failure_rate) }}%</div>
+            <div class="label">Failure Rate</div>
+        </div>
+    </div>
+
+    <!-- Failures Table -->
+    <table class="failures-table">
+        <thead>
+            <tr>
+                <th>DAG ID</th>
+                <th>Run ID</th>
+                <th>Execution Date</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Failed Tasks</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for failure in failures %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('Airflow.graph', dag_id=failure.dag_id) }}" class="dag-link">
+                        {{ failure.dag_id }}
+                    </a>
+                </td>
+                <td><code>{{ failure.run_id }}</code></td>
+                <td>{{ failure.execution_date }}</td>
+                <td>{{ failure.start_date or 'N/A' }}</td>
+                <td>{{ failure.end_date or 'N/A' }}</td>
+                <td>
+                    <span class="badge badge-danger">{{ failure.failed_tasks|length }}</span>
+                    {% if failure.failed_tasks %}
+                    <ul class="task-list">
+                        {% for task in failure.failed_tasks[:3] %}
+                        <li><code>{{ task.task_id }}</code></li>
+                        {% endfor %}
+                        {% if failure.failed_tasks|length > 3 %}
+                        <li><em>...and {{ failure.failed_tasks|length - 3 }} more</em></li>
+                        {% endif %}
+                    </ul>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 40px; color: #666;">
+                    No failures found for the selected period 🎉
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
