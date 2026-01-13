@@ -8,9 +8,13 @@ version = "0.1.0"
 description = "Airflow UI Plugin for monitoring DAG failures and SLA misses"
 readme = "README.md"
 license = {text = "Apache-2.0"}
+license-files = ["LICENSE"]
 requires-python = ">=3.9"
 authors = [
-    {name = "Data Platform Team"}
+    {name = "Ramanujam Solaimalai", email = "ramanujam.solaimalai@gmail.com"}
+]
+maintainers = [
+    {name = "Ramanujam Solaimalai", email = "ramanujam.solaimalai@gmail.com"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -43,7 +47,9 @@ dev = [
 airflow_watcher = "airflow_watcher.plugins.watcher_plugin:AirflowWatcherPlugin"
 
 [project.urls]
-"Homepage" = "https://github.com/your-org/airflow-watcher"
+"Homepage" = "https://github.com/ram07eng/airflow-watcher"
+"Bug Tracker" = "https://github.com/ram07eng/airflow-watcher/issues"
+"Documentation" = "https://github.com/ram07eng/airflow-watcher#readme"
 
 [tool.setuptools.packages.find]
 where = ["src"]
