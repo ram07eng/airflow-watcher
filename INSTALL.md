@@ -27,7 +27,36 @@ This guide covers all methods to install and configure the Airflow Watcher plugi
 
 ## Installation Methods
 
-### Method 1: Clone and Install (Recommended)
+### Method 1: pip install from PyPI (Recommended)
+
+Install the latest stable version from PyPI:
+
+```bash
+pip install airflow-watcher
+```
+
+To install a specific version:
+
+```bash
+pip install airflow-watcher==0.1.0
+```
+
+### Method 2: pip install from GitHub (Recommended)
+
+Install directly from GitHub without cloning:
+
+```bash
+# Install latest version
+pip install git+https://github.com/ram07eng/airflow-watcher.git
+
+# Install specific version/tag
+pip install git+https://github.com/ram07eng/airflow-watcher.git@v0.1.0
+
+# Install with development dependencies
+pip install "airflow-watcher[dev] @ git+https://github.com/ram07eng/airflow-watcher.git"
+```
+
+### Method 3: Clone and Install
 
 Step-by-step installation after cloning:
 
@@ -38,7 +67,7 @@ git clone https://github.com/ram07eng/airflow-watcher.git
 # Step 2: Navigate to the project directory
 cd airflow-watcher
 
-# Step 3: Install the plugin
+# Step 3: Install the plugin (editable mode for development)
 pip install -e .
 
 # Step 4: Restart Airflow webserver
@@ -55,15 +84,24 @@ For development with additional tools (linting, testing):
 pip install -e ".[dev]"
 ```
 
-### Method 2: Direct pip install from GitHub
+### Method 4: Add to requirements.txt
 
-Install without cloning:
+Add to your project's `requirements.txt`:
 
-```bash
-pip install git+https://github.com/ram07eng/airflow-watcher.git
+```txt
+# From GitHub
+airflow-watcher @ git+https://github.com/ram07eng/airflow-watcher.git
+
+# Or with specific version
+airflow-watcher @ git+https://github.com/ram07eng/airflow-watcher.git@v0.1.0
 ```
 
-### Method 3: Copy to plugins folder
+Then install:
+```bash
+pip install -r requirements.txt
+```
+
+### Method 5: Copy to plugins folder
 
 Copy the plugin directly to your Airflow plugins directory:
 
