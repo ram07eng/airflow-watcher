@@ -51,6 +51,8 @@ services:
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
 
   airflow-scheduler:
     <<: *airflow-common
@@ -63,6 +65,8 @@ services:
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
 
   airflow-triggerer:
     <<: *airflow-common
@@ -75,6 +79,8 @@ services:
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
 
   airflow-init:
     <<: *airflow-common
@@ -82,13 +88,17 @@ services:
     command:
       - -c
       - |
-        mkdir -p /sources/logs /sources/dags /sources/plugins /sources/data
-        chown -R "${AIRFLOW_UID:-50000}:0" /sources/{logs,dags,plugins,data} || true
-        airflow db migrate
-        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true
-        echo "Init complete!"
+        exec /entrypoint airflow version
+        if [[ -z "${AIRFLOW_UID}" ]]; then
+          echo "AIRFLOW_UID not set!"
+          exit 1
+        fi
     environment:
       <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
     user: "0:0"
     volumes:
       - .:/sources

@@ -237,3 +237,114 @@ class SlackNotifier:
             })
         
         return blocks
+
+    def send_threshold_alert(
+        self,
+        metric_name: str,
+        current_value: float,
+        threshold: float,
+        severity: str = "warning",
+    ) -> bool:
+        """Send a threshold breach alert to Slack.
+        
+        Args:
+            metric_name: Name of the metric
+            current_value: Current metric value
+            threshold: Threshold that was breached
+            severity: Alert severity (info, warning, error, critical)
+            
+        Returns:
+            True if alert was sent successfully
+        """
+        severity_emoji = {
+            "info": "ℹ️",
+            "warning": "⚠️",
+            "error": "🚨",
+            "critical": "🔥",
+        }
+        
+        emoji = severity_emoji.get(severity, "⚠️")
+        
+        blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f"{emoji} Threshold Alert",
+                    "emoji": True,
+                }
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*Metric:*\n`{metric_name}`"},
+                    {"type": "mrkdwn", "text": f"*Severity:*\n{severity.upper()}"},
+                    {"type": "mrkdwn", "text": f"*Current Value:*\n{current_value}"},
+                    {"type": "mrkdwn", "text": f"*Threshold:*\n{threshold}"},
+                ]
+            },
+        ]
+        
+        try:
+            if self.webhook_client:
+                response = self.webhook_client.send(
+                    text=f"{emoji} Threshold Alert: {metric_name} = {current_value}",
+                    blocks=blocks,
+                )
+                return response.status_code == 200
+            elif self.web_client and self.config.slack_channel:
+                response = self.web_client.chat_postMessage(
+                    channel=self.config.slack_channel,
+                    text=f"{emoji} Threshold Alert: {metric_name} = {current_value}",
+                    blocks=blocks,
+                )
+                return response["ok"]
+        except SlackApiError as e:
+            logger.error(f"Failed to send Slack threshold alert: {e}")
+            return False
+        
+        return False
+
+    def send_test_alert(self) -> bool:
+        """Send a test alert to verify configuration.
+        
+        Returns:
+            True if test alert was sent successfully
+        """
+        blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "✅ Airflow Watcher Test Alert",
+                    "emoji": True,
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "This is a test alert from Airflow Watcher. If you see this, Slack notifications are configured correctly!",
+                }
+            },
+        ]
+        
+        try:
+            if self.webhook_client:
+                response = self.webhook_client.send(
+                    text="✅ Airflow Watcher Test Alert",
+                    blocks=blocks,
+                )
+                return response.status_code == 200
+            elif self.web_client and self.config.slack_channel:
+                response = self.web_client.chat_postMessage(
+                    channel=self.config.slack_channel,
+                    text="✅ Airflow Watcher Test Alert",
+                    blocks=blocks,
+                )
+                return response["ok"]
+        except SlackApiError as e:
+            logger.error(f"Failed to send Slack test alert: {e}")
+            return False
+        
+        return False

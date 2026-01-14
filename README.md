@@ -7,12 +7,37 @@ An Airflow UI plugin for monitoring DAG failures and SLA misses/delays.
 - 🚨 **DAG Failure Monitoring**: Real-time tracking of DAG and task failures
 - ⏰ **SLA Miss Detection**: Alerts when DAGs miss their SLA deadlines
 - 📊 **Dashboard View**: Custom Airflow UI view for monitoring status
-- 🔔 **Multi-channel Notifications**: Support for Slack and email alerts
+- 🔔 **Multi-channel Notifications**: Slack, Email, and PagerDuty alerts
 - 📈 **Trend Analysis**: Historical failure and SLA miss trends
+- 📡 **Metrics Export**: StatsD/Datadog and Prometheus support
+- ⚙️ **Flexible Alert Rules**: Pre-defined templates or custom rules
 
 ## Installation
 
 📖 **See [INSTALL.md](INSTALL.md) for detailed installation and configuration instructions.**
+
+## Alerting & Monitoring
+
+📖 **See [ALERTING.md](ALERTING.md) for complete alerting configuration:**
+
+- **Slack** - Rich notifications with blocks
+- **Email** - SMTP-based alerts
+- **PagerDuty** - Incident management with deduplication
+- **StatsD/Datadog** - Real-time metrics
+- **Prometheus** - `/metrics` endpoint for scraping
+
+### Quick Setup
+
+```bash
+# Slack alerts
+export AIRFLOW_WATCHER_SLACK_WEBHOOK_URL="https://hooks.slack.com/..."
+
+# PagerDuty (optional)
+export AIRFLOW_WATCHER_PAGERDUTY_ROUTING_KEY="your-key"
+
+# Choose alert template
+export AIRFLOW_WATCHER_ALERT_TEMPLATE="production_balanced"
+```
 
 ## Usage
 
