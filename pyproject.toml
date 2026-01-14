@@ -40,6 +40,28 @@ dev = [
     "black>=23.0.0",
     "mypy>=1.0.0",
 ]
+# Alerting integrations
+pagerduty = [
+    "requests>=2.28.0",
+]
+# Metrics backends
+statsd = [
+    # Uses socket - no extra deps needed
+]
+prometheus = [
+    "prometheus-client>=0.15.0",
+]
+# All alerting channels
+alerting = [
+    "requests>=2.28.0",
+    "slack-sdk>=3.19.0",
+]
+# Everything
+all = [
+    "requests>=2.28.0",
+    "slack-sdk>=3.19.0",
+    "prometheus-client>=0.15.0",
+]
 
 [project.entry-points."airflow.plugins"]
 airflow_watcher = "airflow_watcher.plugins.watcher_plugin:AirflowWatcherPlugin"
