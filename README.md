@@ -2,6 +2,10 @@
 
 An Airflow UI plugin for monitoring DAG failures and SLA misses/delays.
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ram07eng/airflow-watcher?quickstart=1)
+
+> **Try it now!** Click the badge above to launch a live demo in GitHub Codespaces. Airflow will start automatically at port 8080 (login: `admin`/`admin`).
+
 ## Features
 
 - 🚨 **DAG Failure Monitoring**: Real-time tracking of DAG and task failures
