@@ -83,7 +83,7 @@ def truncate_string(s: str, max_length: int = 100) -> str:
     """
     if len(s) <= max_length:
         return s
-    return s[:max_length - 3] + "..."
+    return s[: max_length - 3] + "..."
 
 
 def get_severity_color(failure_count: int) -> str:
@@ -154,7 +154,7 @@ def get_all_dag_owners():
         all_owners = set()
         for o in owners:
             if o[0]:
-                for owner in o[0].split(','):
+                for owner in o[0].split(","):
                     owner = owner.strip()
                     if owner:
                         all_owners.add(owner)
@@ -188,9 +188,7 @@ def get_dags_by_filter(tag: Optional[str] = None, owner: Optional[str] = None):
 
         if tag:
             # Join with DagTag table
-            query = query.join(DagTag, DagModel.dag_id == DagTag.dag_id).filter(
-                DagTag.name == tag
-            )
+            query = query.join(DagTag, DagModel.dag_id == DagTag.dag_id).filter(DagTag.name == tag)
 
         if owner:
             query = query.filter(DagModel.owners.contains(owner))

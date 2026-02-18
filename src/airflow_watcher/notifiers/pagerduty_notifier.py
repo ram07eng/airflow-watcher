@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 try:
     import requests
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
@@ -293,4 +294,3 @@ class PagerDutyNotifier:
             source=self.service_name,
             dedup_key=self._generate_dedup_key("test", "airflow-watcher"),
         )
-

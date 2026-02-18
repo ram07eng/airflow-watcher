@@ -1,8 +1,14 @@
 """StatsD Emitter - Sends metrics to StatsD/Datadog."""
 
+from __future__ import annotations
+
 import logging
 import socket
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional
+
+if TYPE_CHECKING:
+    from airflow_watcher.config import WatcherConfig
+    from airflow_watcher.metrics.collector import WatcherMetrics
 
 logger = logging.getLogger(__name__)
 

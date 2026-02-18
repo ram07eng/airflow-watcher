@@ -66,9 +66,7 @@ class TestPagerDutyNotifier:
             dag_id="test_dag",
             run_id="run_1",
             execution_date=now,
-            failed_tasks=[
-                TaskFailure(task_id="t1", dag_id="test_dag", run_id="run_1", execution_date=now)
-            ],
+            failed_tasks=[TaskFailure(task_id="t1", dag_id="test_dag", run_id="run_1", execution_date=now)],
         )
         result = notifier.send_failure_alert(failure)
         assert result is True

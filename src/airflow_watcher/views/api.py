@@ -22,21 +22,19 @@ def get_failures():
     hours = int(request.args.get("hours", 24))
     limit = int(request.args.get("limit", 50))
 
-    failures = failure_monitor.get_recent_failures(
-        dag_id=dag_id,
-        lookback_hours=hours,
-        limit=limit
-    )
+    failures = failure_monitor.get_recent_failures(dag_id=dag_id, lookback_hours=hours, limit=limit)
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "failures": [f.to_dict() for f in failures],
-            "count": len(failures),
-            "filters": {"dag_id": dag_id, "hours": hours},
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "failures": [f.to_dict() for f in failures],
+                "count": len(failures),
+                "filters": {"dag_id": dag_id, "hours": hours},
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/failures/stats", methods=["GET"])
@@ -47,11 +45,13 @@ def get_failure_stats():
     hours = int(request.args.get("hours", 24))
     stats = failure_monitor.get_failure_statistics(lookback_hours=hours)
 
-    return jsonify({
-        "status": "success",
-        "data": stats,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": stats,
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/sla/misses", methods=["GET"])
@@ -63,21 +63,19 @@ def get_sla_misses():
     hours = int(request.args.get("hours", 24))
     limit = int(request.args.get("limit", 50))
 
-    sla_misses = sla_monitor.get_recent_sla_misses(
-        dag_id=dag_id,
-        lookback_hours=hours,
-        limit=limit
-    )
+    sla_misses = sla_monitor.get_recent_sla_misses(dag_id=dag_id, lookback_hours=hours, limit=limit)
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "sla_misses": [s.to_dict() for s in sla_misses],
-            "count": len(sla_misses),
-            "filters": {"dag_id": dag_id, "hours": hours},
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "sla_misses": [s.to_dict() for s in sla_misses],
+                "count": len(sla_misses),
+                "filters": {"dag_id": dag_id, "hours": hours},
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/sla/stats", methods=["GET"])
@@ -88,11 +86,13 @@ def get_sla_stats():
     hours = int(request.args.get("hours", 24))
     stats = sla_monitor.get_sla_statistics(lookback_hours=hours)
 
-    return jsonify({
-        "status": "success",
-        "data": stats,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": stats,
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/health", methods=["GET"])
@@ -126,11 +126,16 @@ def get_health():
         return jsonify({"status": "success", "data": payload}), http_status
 
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e),
-            "timestamp": timezone.utcnow().isoformat(),
-        }), 503
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": str(e),
+                    "timestamp": timezone.utcnow().isoformat(),
+                }
+            ),
+            503,
+        )
 
 
 @watcher_api_blueprint.route("/health/<dag_id>", methods=["GET"])
@@ -142,20 +147,23 @@ def get_dag_health(dag_id: str):
     dag_failures = failure_monitor.get_recent_failures(dag_id=dag_id, limit=10)
     dag_sla_misses = sla_monitor.get_recent_sla_misses(dag_id=dag_id, limit=10)
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "dag_id": dag_id,
-            "recent_failures": [f.to_dict() for f in dag_failures],
-            "recent_sla_misses": [s.to_dict() for s in dag_sla_misses],
-            "failure_count": len(dag_failures),
-            "sla_miss_count": len(dag_sla_misses),
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "dag_id": dag_id,
+                "recent_failures": [f.to_dict() for f in dag_failures],
+                "recent_sla_misses": [s.to_dict() for s in dag_sla_misses],
+                "failure_count": len(dag_failures),
+                "sla_miss_count": len(dag_sla_misses),
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 # ============== Task Health Endpoints ==============
+
 
 @watcher_api_blueprint.route("/tasks/long-running", methods=["GET"])
 def get_long_running_tasks():
@@ -165,15 +173,17 @@ def get_long_running_tasks():
 
     tasks = monitor.get_long_running_tasks(threshold_minutes=threshold)
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "tasks": tasks,
-            "count": len(tasks),
-            "threshold_minutes": threshold,
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "tasks": tasks,
+                "count": len(tasks),
+                "threshold_minutes": threshold,
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/tasks/retries", methods=["GET"])
@@ -185,14 +195,16 @@ def get_retry_heavy_tasks():
 
     tasks = monitor.get_retry_heavy_tasks(lookback_hours=hours, min_retries=min_retries)
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "tasks": tasks,
-            "count": len(tasks),
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "tasks": tasks,
+                "count": len(tasks),
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/tasks/zombies", methods=["GET"])
@@ -203,15 +215,17 @@ def get_zombie_tasks():
 
     zombies = monitor.get_zombie_tasks(zombie_threshold_minutes=threshold)
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "zombies": zombies,
-            "count": len(zombies),
-            "threshold_minutes": threshold,
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "zombies": zombies,
+                "count": len(zombies),
+                "threshold_minutes": threshold,
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/tasks/failure-patterns", methods=["GET"])
@@ -222,14 +236,17 @@ def get_task_failure_patterns():
 
     patterns = monitor.get_task_failure_patterns(lookback_hours=hours)
 
-    return jsonify({
-        "status": "success",
-        "data": patterns,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": patterns,
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 # ============== Scheduling Endpoints ==============
+
 
 @watcher_api_blueprint.route("/scheduling/lag", methods=["GET"])
 def get_scheduling_lag():
@@ -243,11 +260,13 @@ def get_scheduling_lag():
         lag_threshold_minutes=threshold,
     )
 
-    return jsonify({
-        "status": "success",
-        "data": lag_data,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": lag_data,
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/scheduling/queue", methods=["GET"])
@@ -257,11 +276,13 @@ def get_queue_status():
 
     queue_data = monitor.get_queued_tasks()
 
-    return jsonify({
-        "status": "success",
-        "data": queue_data,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": queue_data,
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/scheduling/pools", methods=["GET"])
@@ -271,14 +292,16 @@ def get_pool_utilization():
 
     pools = monitor.get_pool_utilization()
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "pools": pools,
-            "count": len(pools),
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "pools": pools,
+                "count": len(pools),
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/scheduling/stale-dags", methods=["GET"])
@@ -289,14 +312,16 @@ def get_stale_dags():
 
     stale = monitor.get_stale_dags(expected_interval_hours=hours)
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "stale_dags": stale,
-            "count": len(stale),
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "stale_dags": stale,
+                "count": len(stale),
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/scheduling/concurrent", methods=["GET"])
@@ -306,14 +331,17 @@ def get_concurrent_runs():
 
     concurrent = monitor.get_concurrent_runs()
 
-    return jsonify({
-        "status": "success",
-        "data": concurrent,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": concurrent,
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 # ============== DAG Health Endpoints ==============
+
 
 @watcher_api_blueprint.route("/dags/import-errors", methods=["GET"])
 def get_import_errors():
@@ -322,14 +350,16 @@ def get_import_errors():
 
     errors = monitor.get_dag_import_errors()
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "errors": errors,
-            "count": len(errors),
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "errors": errors,
+                "count": len(errors),
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/dags/status-summary", methods=["GET"])
@@ -339,11 +369,13 @@ def get_dag_status_summary():
 
     summary = monitor.get_dag_status_summary()
 
-    return jsonify({
-        "status": "success",
-        "data": summary,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": summary,
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/dags/complexity", methods=["GET"])
@@ -353,14 +385,16 @@ def get_dag_complexity():
 
     complexity = monitor.get_dag_complexity_analysis()
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "dags": complexity,
-            "count": len(complexity),
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "dags": complexity,
+                "count": len(complexity),
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/dags/inactive", methods=["GET"])
@@ -371,18 +405,21 @@ def get_inactive_dags():
 
     inactive = monitor.get_inactive_dags(inactive_days=days)
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "inactive_dags": inactive,
-            "count": len(inactive),
-            "threshold_days": days,
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "inactive_dags": inactive,
+                "count": len(inactive),
+                "threshold_days": days,
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 # ============== Dependency Endpoints ==============
+
 
 @watcher_api_blueprint.route("/dependencies/upstream-failures", methods=["GET"])
 def get_upstream_failures():
@@ -392,14 +429,16 @@ def get_upstream_failures():
 
     failures = monitor.get_upstream_failures(lookback_hours=hours)
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "upstream_failures": failures,
-            "count": len(failures),
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "upstream_failures": failures,
+                "count": len(failures),
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/dependencies/cross-dag", methods=["GET"])
@@ -409,14 +448,16 @@ def get_cross_dag_dependencies():
 
     dependencies = monitor.get_cross_dag_dependencies()
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "dependencies": dependencies,
-            "count": len(dependencies),
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "dependencies": dependencies,
+                "count": len(dependencies),
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/dependencies/correlations", methods=["GET"])
@@ -427,11 +468,13 @@ def get_failure_correlations():
 
     correlations = monitor.get_failure_correlation(lookback_hours=hours)
 
-    return jsonify({
-        "status": "success",
-        "data": correlations,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": correlations,
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 @watcher_api_blueprint.route("/dependencies/impact/<dag_id>/<task_id>", methods=["GET"])
@@ -441,14 +484,17 @@ def get_task_failure_impact(dag_id: str, task_id: str):
 
     impact = monitor.get_cascading_failure_impact(dag_id=dag_id, task_id=task_id)
 
-    return jsonify({
-        "status": "success",
-        "data": impact,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": impact,
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )
 
 
 # ============== Combined Dashboard Endpoint ==============
+
 
 @watcher_api_blueprint.route("/overview", methods=["GET"])
 def get_full_overview():
@@ -459,16 +505,18 @@ def get_full_overview():
     scheduling_monitor = SchedulingMonitor()
     dag_monitor = DAGHealthMonitor()
 
-    return jsonify({
-        "status": "success",
-        "data": {
-            "failure_stats": failure_monitor.get_failure_statistics(lookback_hours=24),
-            "sla_stats": sla_monitor.get_sla_statistics(lookback_hours=24),
-            "long_running_tasks": len(task_monitor.get_long_running_tasks(threshold_minutes=60)),
-            "zombie_count": len(task_monitor.get_zombie_tasks()),
-            "queue_status": scheduling_monitor.get_queued_tasks(),
-            "dag_summary": dag_monitor.get_dag_status_summary(),
-            "import_errors": len(dag_monitor.get_dag_import_errors()),
-        },
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "data": {
+                "failure_stats": failure_monitor.get_failure_statistics(lookback_hours=24),
+                "sla_stats": sla_monitor.get_sla_statistics(lookback_hours=24),
+                "long_running_tasks": len(task_monitor.get_long_running_tasks(threshold_minutes=60)),
+                "zombie_count": len(task_monitor.get_zombie_tasks()),
+                "queue_status": scheduling_monitor.get_queued_tasks(),
+                "dag_summary": dag_monitor.get_dag_status_summary(),
+                "import_errors": len(dag_monitor.get_dag_import_errors()),
+            },
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+    )

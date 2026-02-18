@@ -17,6 +17,7 @@ class TestDAGFailureMonitor:
     def test_init_with_custom_config(self):
         """Test initialization with custom config."""
         from airflow_watcher.config import WatcherConfig
+
         config = WatcherConfig(failure_lookback_hours=48)
         monitor = DAGFailureMonitor(config=config)
         assert monitor.config.failure_lookback_hours == 48
@@ -120,4 +121,3 @@ class TestDAGFailureMonitor:
         """DAGFailureMonitor uses config lookback_hours default of 24."""
         monitor = DAGFailureMonitor()
         assert monitor.config.failure_lookback_hours == 24
-
