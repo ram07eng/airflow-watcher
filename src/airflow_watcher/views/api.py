@@ -1,15 +1,14 @@
 """API endpoints for Airflow Watcher."""
 
-from flask import Blueprint, jsonify, request
 from airflow.utils import timezone
+from flask import Blueprint, jsonify, request
 
 from airflow_watcher.monitors.dag_failure_monitor import DAGFailureMonitor
-from airflow_watcher.monitors.sla_monitor import SLAMonitor
-from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
-from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
 from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
 from airflow_watcher.monitors.dependency_monitor import DependencyMonitor
-
+from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
+from airflow_watcher.monitors.sla_monitor import SLAMonitor
+from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
 
 watcher_api_blueprint = Blueprint("watcher_api", __name__, url_prefix="/api/watcher")
 
@@ -18,7 +17,7 @@ watcher_api_blueprint = Blueprint("watcher_api", __name__, url_prefix="/api/watc
 def get_failures():
     """Get recent DAG failures via API."""
     failure_monitor = DAGFailureMonitor()
-    
+
     dag_id = request.args.get("dag_id")
     hours = int(request.args.get("hours", 24))
     limit = int(request.args.get("limit", 50))
@@ -28,7 +27,7 @@ def get_failures():
         lookback_hours=hours,
         limit=limit
     )
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -44,10 +43,10 @@ def get_failures():
 def get_failure_stats():
     """Get failure statistics via API."""
     failure_monitor = DAGFailureMonitor()
-    
+
     hours = int(request.args.get("hours", 24))
     stats = failure_monitor.get_failure_statistics(lookback_hours=hours)
-    
+
     return jsonify({
         "status": "success",
         "data": stats,
@@ -59,7 +58,7 @@ def get_failure_stats():
 def get_sla_misses():
     """Get SLA misses via API."""
     sla_monitor = SLAMonitor()
-    
+
     dag_id = request.args.get("dag_id")
     hours = int(request.args.get("hours", 24))
     limit = int(request.args.get("limit", 50))
@@ -69,7 +68,7 @@ def get_sla_misses():
         lookback_hours=hours,
         limit=limit
     )
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -85,10 +84,10 @@ def get_sla_misses():
 def get_sla_stats():
     """Get SLA statistics via API."""
     sla_monitor = SLAMonitor()
-    
+
     hours = int(request.args.get("hours", 24))
     stats = sla_monitor.get_sla_statistics(lookback_hours=hours)
-    
+
     return jsonify({
         "status": "success",
         "data": stats,
@@ -139,10 +138,10 @@ def get_dag_health(dag_id: str):
     """Get health status for a specific DAG."""
     failure_monitor = DAGFailureMonitor()
     sla_monitor = SLAMonitor()
-    
+
     dag_failures = failure_monitor.get_recent_failures(dag_id=dag_id, limit=10)
     dag_sla_misses = sla_monitor.get_recent_sla_misses(dag_id=dag_id, limit=10)
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -163,9 +162,9 @@ def get_long_running_tasks():
     """Get tasks running longer than expected."""
     monitor = TaskHealthMonitor()
     threshold = int(request.args.get("threshold_minutes", 60))
-    
+
     tasks = monitor.get_long_running_tasks(threshold_minutes=threshold)
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -183,9 +182,9 @@ def get_retry_heavy_tasks():
     monitor = TaskHealthMonitor()
     hours = int(request.args.get("hours", 24))
     min_retries = int(request.args.get("min_retries", 2))
-    
+
     tasks = monitor.get_retry_heavy_tasks(lookback_hours=hours, min_retries=min_retries)
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -201,9 +200,9 @@ def get_zombie_tasks():
     """Get potential zombie tasks."""
     monitor = TaskHealthMonitor()
     threshold = int(request.args.get("threshold_minutes", 120))
-    
+
     zombies = monitor.get_zombie_tasks(zombie_threshold_minutes=threshold)
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -220,9 +219,9 @@ def get_task_failure_patterns():
     """Get task failure pattern analysis."""
     monitor = TaskHealthMonitor()
     hours = int(request.args.get("hours", 168))  # 7 days default
-    
+
     patterns = monitor.get_task_failure_patterns(lookback_hours=hours)
-    
+
     return jsonify({
         "status": "success",
         "data": patterns,
@@ -238,12 +237,12 @@ def get_scheduling_lag():
     monitor = SchedulingMonitor()
     hours = int(request.args.get("hours", 24))
     threshold = int(request.args.get("threshold_minutes", 10))
-    
+
     lag_data = monitor.get_scheduling_lag(
         lookback_hours=hours,
         lag_threshold_minutes=threshold,
     )
-    
+
     return jsonify({
         "status": "success",
         "data": lag_data,
@@ -255,9 +254,9 @@ def get_scheduling_lag():
 def get_queue_status():
     """Get current queue status."""
     monitor = SchedulingMonitor()
-    
+
     queue_data = monitor.get_queued_tasks()
-    
+
     return jsonify({
         "status": "success",
         "data": queue_data,
@@ -269,9 +268,9 @@ def get_queue_status():
 def get_pool_utilization():
     """Get pool utilization stats."""
     monitor = SchedulingMonitor()
-    
+
     pools = monitor.get_pool_utilization()
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -287,9 +286,9 @@ def get_stale_dags():
     """Get DAGs that haven't run when expected."""
     monitor = SchedulingMonitor()
     hours = int(request.args.get("expected_interval_hours", 24))
-    
+
     stale = monitor.get_stale_dags(expected_interval_hours=hours)
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -304,9 +303,9 @@ def get_stale_dags():
 def get_concurrent_runs():
     """Get DAGs with multiple concurrent runs."""
     monitor = SchedulingMonitor()
-    
+
     concurrent = monitor.get_concurrent_runs()
-    
+
     return jsonify({
         "status": "success",
         "data": concurrent,
@@ -320,9 +319,9 @@ def get_concurrent_runs():
 def get_import_errors():
     """Get DAG import/parse errors."""
     monitor = DAGHealthMonitor()
-    
+
     errors = monitor.get_dag_import_errors()
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -337,9 +336,9 @@ def get_import_errors():
 def get_dag_status_summary():
     """Get overall DAG status summary."""
     monitor = DAGHealthMonitor()
-    
+
     summary = monitor.get_dag_status_summary()
-    
+
     return jsonify({
         "status": "success",
         "data": summary,
@@ -351,9 +350,9 @@ def get_dag_status_summary():
 def get_dag_complexity():
     """Get DAG complexity analysis."""
     monitor = DAGHealthMonitor()
-    
+
     complexity = monitor.get_dag_complexity_analysis()
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -369,9 +368,9 @@ def get_inactive_dags():
     """Get inactive DAGs."""
     monitor = DAGHealthMonitor()
     days = int(request.args.get("days", 30))
-    
+
     inactive = monitor.get_inactive_dags(inactive_days=days)
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -390,9 +389,9 @@ def get_upstream_failures():
     """Get tasks in upstream_failed state."""
     monitor = DependencyMonitor()
     hours = int(request.args.get("hours", 24))
-    
+
     failures = monitor.get_upstream_failures(lookback_hours=hours)
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -407,9 +406,9 @@ def get_upstream_failures():
 def get_cross_dag_dependencies():
     """Get cross-DAG dependencies."""
     monitor = DependencyMonitor()
-    
+
     dependencies = monitor.get_cross_dag_dependencies()
-    
+
     return jsonify({
         "status": "success",
         "data": {
@@ -425,9 +424,9 @@ def get_failure_correlations():
     """Get failure correlations between DAGs."""
     monitor = DependencyMonitor()
     hours = int(request.args.get("hours", 24))
-    
+
     correlations = monitor.get_failure_correlation(lookback_hours=hours)
-    
+
     return jsonify({
         "status": "success",
         "data": correlations,
@@ -439,9 +438,9 @@ def get_failure_correlations():
 def get_task_failure_impact(dag_id: str, task_id: str):
     """Get downstream impact of a task failure."""
     monitor = DependencyMonitor()
-    
+
     impact = monitor.get_cascading_failure_impact(dag_id=dag_id, task_id=task_id)
-    
+
     return jsonify({
         "status": "success",
         "data": impact,
@@ -459,7 +458,7 @@ def get_full_overview():
     task_monitor = TaskHealthMonitor()
     scheduling_monitor = SchedulingMonitor()
     dag_monitor = DAGHealthMonitor()
-    
+
     return jsonify({
         "status": "success",
         "data": {

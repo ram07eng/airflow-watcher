@@ -1,15 +1,15 @@
 """StatsD Emitter - Sends metrics to StatsD/Datadog."""
 
 import logging
-from typing import Optional, Dict, Any, List
 import socket
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class StatsDEmitter:
     """Emits metrics to StatsD or DogStatsD (Datadog)."""
-    
+
     def __init__(
         self,
         host: str = "localhost",
@@ -19,7 +19,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ):
         """Initialize StatsD emitter.
-        
+
         Args:
             host: StatsD server hostname
             port: StatsD server port
@@ -34,13 +34,13 @@ class StatsDEmitter:
         self.default_tags = tags or {}
         self._socket: Optional[socket.socket] = None
         self._enabled = True
-        
+
     def _get_socket(self) -> socket.socket:
         """Get or create UDP socket."""
         if self._socket is None:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         return self._socket
-    
+
     def _format_tags(self, tags: Optional[Dict[str, str]] = None) -> str:
         """Format tags for DogStatsD."""
         all_tags = {**self.default_tags, **(tags or {})}
@@ -48,12 +48,12 @@ class StatsDEmitter:
             return ""
         tag_str = ",".join(f"{k}:{v}" for k, v in all_tags.items())
         return f"|#{tag_str}"
-    
+
     def _send(self, data: str) -> bool:
         """Send data to StatsD server."""
         if not self._enabled:
             return False
-            
+
         try:
             sock = self._get_socket()
             sock.sendto(data.encode(), (self.host, self.port))
@@ -61,7 +61,7 @@ class StatsDEmitter:
         except Exception as e:
             logger.warning(f"Failed to send to StatsD: {e}")
             return False
-    
+
     def gauge(
         self,
         name: str,
@@ -69,7 +69,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Send a gauge metric.
-        
+
         Args:
             name: Metric name
             value: Metric value
@@ -79,7 +79,7 @@ class StatsDEmitter:
         tag_str = self._format_tags(tags)
         data = f"{metric_name}:{value}|g{tag_str}"
         return self._send(data)
-    
+
     def counter(
         self,
         name: str,
@@ -87,7 +87,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Send a counter metric.
-        
+
         Args:
             name: Metric name
             value: Increment value (default 1)
@@ -97,7 +97,7 @@ class StatsDEmitter:
         tag_str = self._format_tags(tags)
         data = f"{metric_name}:{value}|c{tag_str}"
         return self._send(data)
-    
+
     def timing(
         self,
         name: str,
@@ -105,7 +105,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Send a timing metric.
-        
+
         Args:
             name: Metric name
             value_ms: Duration in milliseconds
@@ -115,7 +115,7 @@ class StatsDEmitter:
         tag_str = self._format_tags(tags)
         data = f"{metric_name}:{value_ms}|ms{tag_str}"
         return self._send(data)
-    
+
     def histogram(
         self,
         name: str,
@@ -123,7 +123,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Send a histogram metric (DogStatsD only).
-        
+
         Args:
             name: Metric name
             value: Metric value
@@ -132,51 +132,50 @@ class StatsDEmitter:
         if not self.use_dogstatsd:
             # Fall back to timing for standard StatsD
             return self.timing(name, value, tags)
-            
+
         metric_name = f"{self.prefix}.{name}"
         tag_str = self._format_tags(tags)
         data = f"{metric_name}:{value}|h{tag_str}"
         return self._send(data)
-    
+
     def emit_watcher_metrics(self, metrics: "WatcherMetrics") -> Dict[str, bool]:
         """Emit all Watcher metrics.
-        
+
         Args:
             metrics: WatcherMetrics object
-            
+
         Returns:
             Dict of metric names to success status
         """
-        from airflow_watcher.metrics.collector import WatcherMetrics
-        
+
         results = {}
         for name, value in metrics.to_dict().items():
             if isinstance(value, (int, float)):
                 results[name] = self.gauge(name, value)
-        
+
         return results
-    
+
     def close(self):
         """Close the socket connection."""
         if self._socket:
             self._socket.close()
             self._socket = None
-    
+
     def disable(self):
         """Disable metric emission."""
         self._enabled = False
-    
+
     def enable(self):
         """Enable metric emission."""
         self._enabled = True
-    
+
     @classmethod
     def from_config(cls, config: "WatcherConfig") -> "StatsDEmitter":
         """Create emitter from WatcherConfig.
-        
+
         Args:
             config: WatcherConfig instance
-            
+
         Returns:
             Configured StatsDEmitter
         """

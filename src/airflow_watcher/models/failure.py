@@ -8,7 +8,7 @@ from typing import List, Optional
 @dataclass
 class TaskFailure:
     """Represents a task failure."""
-    
+
     task_id: str
     dag_id: str
     run_id: str
@@ -20,7 +20,7 @@ class TaskFailure:
     try_number: int = 1
     max_tries: int = 1
     operator: Optional[str] = None
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
@@ -41,7 +41,7 @@ class TaskFailure:
 @dataclass
 class DAGFailure:
     """Represents a DAG failure."""
-    
+
     dag_id: str
     run_id: str
     execution_date: datetime
@@ -50,7 +50,7 @@ class DAGFailure:
     state: str = "failed"
     failed_tasks: List[TaskFailure] = field(default_factory=list)
     external_trigger: bool = False
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
@@ -64,7 +64,7 @@ class DAGFailure:
             "failed_task_count": len(self.failed_tasks),
             "external_trigger": self.external_trigger,
         }
-    
+
     @property
     def duration(self) -> Optional[float]:
         """Get duration in seconds."""

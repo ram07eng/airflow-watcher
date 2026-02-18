@@ -1,8 +1,8 @@
 """PagerDuty Notifier for Airflow Watcher alerts."""
 
-import logging
 import hashlib
-from typing import Optional, Dict, Any, List
+import logging
+from typing import Any, Dict, List, Optional
 
 try:
     import requests
@@ -12,10 +12,9 @@ except ImportError:
 
 from airflow.utils import timezone
 
+from airflow_watcher.config import WatcherConfig
 from airflow_watcher.models.failure import DAGFailure
 from airflow_watcher.models.sla import SLAMissEvent
-from airflow_watcher.config import WatcherConfig
-
 
 logger = logging.getLogger(__name__)
 

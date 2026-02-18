@@ -1,18 +1,17 @@
 """Scheduling Monitor - Tracks DAG scheduling lag and queue health."""
 
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict
 import logging
-from airflow.utils import timezone
+from datetime import timedelta
+from typing import Dict, List, Optional
 
-from airflow.models import DagRun, DagModel, TaskInstance
-from airflow.utils.state import DagRunState, TaskInstanceState
+from airflow.models import DagModel, DagRun, TaskInstance
+from airflow.utils import timezone
 from airflow.utils.session import provide_session
-from sqlalchemy.orm import Session
+from airflow.utils.state import DagRunState, TaskInstanceState
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from airflow_watcher.config import WatcherConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -32,19 +31,19 @@ class SchedulingMonitor:
         session: Session = None,
     ) -> Dict:
         """Analyze scheduling lag across DAGs.
-        
+
         Scheduling lag = time between scheduled execution time and actual start.
-        
+
         Args:
             lookback_hours: Hours to analyze
             lag_threshold_minutes: Threshold to flag as delayed
             session: SQLAlchemy session
-            
+
         Returns:
             Dictionary with scheduling lag analysis
         """
         cutoff_time = timezone.utcnow() - timedelta(hours=lookback_hours)
-        
+
         # Get DAG runs with both scheduled time and start time
         query = session.query(DagRun).filter(
             DagRun.start_date >= cutoff_time,
@@ -52,17 +51,17 @@ class SchedulingMonitor:
             DagRun.start_date.isnot(None),
             DagRun.run_type == "scheduled",  # Only scheduled runs, not manual
         )
-        
+
         lags = []
         delayed_dags = []
-        
+
         for dag_run in query.all():
             # Calculate lag (start_date - execution_date)
             lag_seconds = (dag_run.start_date - dag_run.execution_date).total_seconds()
             lag_minutes = lag_seconds / 60
-            
+
             lags.append(lag_minutes)
-            
+
             if lag_minutes > lag_threshold_minutes:
                 delayed_dags.append({
                     "dag_id": dag_run.dag_id,
@@ -71,24 +70,24 @@ class SchedulingMonitor:
                     "actual_start": dag_run.start_date.isoformat(),
                     "lag_minutes": round(lag_minutes, 2),
                 })
-        
+
         if not lags:
             return {
                 "period_hours": lookback_hours,
                 "total_runs": 0,
                 "message": "No scheduled DAG runs found in the period",
             }
-        
+
         # Calculate statistics
         avg_lag = sum(lags) / len(lags)
         max_lag = max(lags)
         min_lag = min(lags)
-        
+
         sorted_lags = sorted(lags)
         p50_idx = int(len(sorted_lags) * 0.5)
         p90_idx = int(len(sorted_lags) * 0.9)
         p95_idx = min(int(len(sorted_lags) * 0.95), len(sorted_lags) - 1)
-        
+
         return {
             "period_hours": lookback_hours,
             "total_runs": len(lags),
@@ -110,10 +109,10 @@ class SchedulingMonitor:
     @provide_session
     def get_queued_tasks(self, session: Session = None) -> Dict:
         """Get tasks currently waiting in queue.
-        
+
         Args:
             session: SQLAlchemy session
-            
+
         Returns:
             Dictionary with queue status
         """
@@ -121,20 +120,20 @@ class SchedulingMonitor:
         queued = session.query(TaskInstance).filter(
             TaskInstance.state == TaskInstanceState.QUEUED,
         ).all()
-        
+
         # Tasks in scheduled state (waiting to be picked up)
         scheduled = session.query(TaskInstance).filter(
             TaskInstance.state == TaskInstanceState.SCHEDULED,
         ).all()
-        
+
         current_time = timezone.utcnow()
-        
+
         queued_details = []
         for ti in queued:
             wait_time = None
             if ti.queued_dttm:
                 wait_time = (current_time - ti.queued_dttm).total_seconds() / 60
-            
+
             queued_details.append({
                 "dag_id": ti.dag_id,
                 "task_id": ti.task_id,
@@ -144,7 +143,7 @@ class SchedulingMonitor:
                 "pool": ti.pool,
                 "priority_weight": ti.priority_weight,
             })
-        
+
         scheduled_details = []
         for ti in scheduled:
             scheduled_details.append({
@@ -153,14 +152,14 @@ class SchedulingMonitor:
                 "run_id": ti.run_id,
                 "pool": ti.pool,
             })
-        
+
         # Sort by wait time
         queued_details = sorted(
             queued_details,
             key=lambda x: x["wait_minutes"] or 0,
             reverse=True
         )
-        
+
         return {
             "queued_count": len(queued),
             "scheduled_count": len(scheduled),
@@ -174,17 +173,17 @@ class SchedulingMonitor:
     @provide_session
     def get_pool_utilization(self, session: Session = None) -> List[Dict]:
         """Get pool utilization across all pools.
-        
+
         Args:
             session: SQLAlchemy session
-            
+
         Returns:
             List of pool utilization details
         """
         from airflow.models import Pool
-        
+
         pools = session.query(Pool).all()
-        
+
         pool_stats = []
         for pool in pools:
             # Count running tasks in this pool
@@ -192,15 +191,15 @@ class SchedulingMonitor:
                 TaskInstance.pool == pool.pool,
                 TaskInstance.state == TaskInstanceState.RUNNING,
             ).count()
-            
+
             # Count queued tasks in this pool
             queued = session.query(TaskInstance).filter(
                 TaskInstance.pool == pool.pool,
                 TaskInstance.state == TaskInstanceState.QUEUED,
             ).count()
-            
+
             utilization = (running / pool.slots * 100) if pool.slots > 0 else 0
-            
+
             pool_stats.append({
                 "pool_name": pool.pool,
                 "slots": pool.slots,
@@ -211,7 +210,7 @@ class SchedulingMonitor:
                 "is_saturated": running >= pool.slots,
                 "description": pool.description,
             })
-        
+
         return sorted(pool_stats, key=lambda x: x["utilization_percent"], reverse=True)
 
     @provide_session
@@ -221,31 +220,31 @@ class SchedulingMonitor:
         session: Session = None,
     ) -> List[Dict]:
         """Find DAGs that haven't run when expected.
-        
+
         Args:
             expected_interval_hours: Expected max hours between runs
             session: SQLAlchemy session
-            
+
         Returns:
             List of stale DAGs
         """
         cutoff_time = timezone.utcnow() - timedelta(hours=expected_interval_hours)
-        
+
         # Get all active DAGs
         active_dags = session.query(DagModel).filter(
-            DagModel.is_paused == False,
-            DagModel.is_active == True,
+            not DagModel.is_paused,
+            DagModel.is_active,
         ).all()
-        
+
         stale_dags = []
         current_time = timezone.utcnow()
-        
+
         for dag in active_dags:
             # Get the most recent run
             latest_run = session.query(DagRun).filter(
                 DagRun.dag_id == dag.dag_id,
             ).order_by(DagRun.execution_date.desc()).first()
-            
+
             if not latest_run:
                 # Never run
                 stale_dags.append({
@@ -265,16 +264,16 @@ class SchedulingMonitor:
                     "status": "stale",
                     "schedule_interval": str(dag.schedule_interval),
                 })
-        
+
         return sorted(stale_dags, key=lambda x: x.get("hours_since_run") or 999999, reverse=True)
 
     @provide_session
     def get_concurrent_runs(self, session: Session = None) -> Dict:
         """Get DAGs with multiple concurrent runs (potential issues).
-        
+
         Args:
             session: SQLAlchemy session
-            
+
         Returns:
             Dictionary with concurrent run information
         """
@@ -287,7 +286,7 @@ class SchedulingMonitor:
         ).group_by(DagRun.dag_id).having(
             func.count(DagRun.dag_id) > 1
         ).all()
-        
+
         concurrent_dags = []
         for dag_id, count in concurrent:
             # Get the running instances
@@ -295,7 +294,7 @@ class SchedulingMonitor:
                 DagRun.dag_id == dag_id,
                 DagRun.state == DagRunState.RUNNING,
             ).order_by(DagRun.execution_date.desc()).all()
-            
+
             concurrent_dags.append({
                 "dag_id": dag_id,
                 "running_count": count,
@@ -308,7 +307,7 @@ class SchedulingMonitor:
                     for r in runs
                 ],
             })
-        
+
         return {
             "dags_with_concurrent_runs": len(concurrent_dags),
             "concurrent_dags": concurrent_dags,

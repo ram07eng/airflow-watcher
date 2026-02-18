@@ -1,6 +1,5 @@
 """Tests for WatcherConfig."""
 
-import pytest
 import os
 from unittest.mock import patch
 
@@ -13,7 +12,7 @@ class TestWatcherConfig:
     def test_default_config(self):
         """Test default configuration values."""
         config = WatcherConfig()
-        
+
         assert config.slack_webhook_url is None
         assert config.slack_channel == "#airflow-alerts"
         assert config.smtp_port == 587
@@ -27,7 +26,7 @@ class TestWatcherConfig:
             slack_channel="#test-channel",
             failure_lookback_hours=48,
         )
-        
+
         assert config.slack_webhook_url == "https://hooks.slack.com/test"
         assert config.slack_channel == "#test-channel"
         assert config.failure_lookback_hours == 48
@@ -37,7 +36,7 @@ class TestWatcherConfig:
         config = WatcherConfig(
             email_recipients=["user1@example.com", "user2@example.com"]
         )
-        
+
         assert len(config.email_recipients) == 2
         assert "user1@example.com" in config.email_recipients
 
@@ -49,7 +48,7 @@ class TestWatcherConfig:
         """Test loading config from environment variables."""
         config = WatcherConfig()
         config._load_from_env()
-        
+
         assert config.slack_webhook_url == "https://env-webhook.com"
         assert config.slack_channel == "#env-channel"
 
@@ -60,7 +59,7 @@ class TestWatcherConfig:
         """Test loading integer config from environment."""
         config = WatcherConfig()
         config._load_from_env()
-        
+
         assert config.smtp_port == 465
 
     @patch.dict(os.environ, {
@@ -70,7 +69,7 @@ class TestWatcherConfig:
         """Test loading list config from environment."""
         config = WatcherConfig()
         config._load_from_env()
-        
+
         assert len(config.email_recipients) == 2
         assert "user1@test.com" in config.email_recipients
         assert "user2@test.com" in config.email_recipients

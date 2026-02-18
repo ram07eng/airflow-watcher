@@ -4,13 +4,12 @@ import logging
 from typing import List, Optional
 
 from slack_sdk import WebClient
-from slack_sdk.webhook import WebhookClient
 from slack_sdk.errors import SlackApiError
+from slack_sdk.webhook import WebhookClient
 
+from airflow_watcher.config import WatcherConfig
 from airflow_watcher.models.failure import DAGFailure
 from airflow_watcher.models.sla import SLAMissEvent
-from airflow_watcher.config import WatcherConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -20,31 +19,31 @@ class SlackNotifier:
 
     def __init__(self, config: Optional[WatcherConfig] = None):
         """Initialize Slack notifier.
-        
+
         Args:
             config: Configuration object with Slack settings
         """
         self.config = config or WatcherConfig()
         self.webhook_client = None
         self.web_client = None
-        
+
         if self.config.slack_webhook_url:
             self.webhook_client = WebhookClient(self.config.slack_webhook_url)
-        
+
         if self.config.slack_token:
             self.web_client = WebClient(token=self.config.slack_token)
 
     def send_failure_alert(self, failure: DAGFailure) -> bool:
         """Send a DAG failure alert to Slack.
-        
+
         Args:
             failure: DAGFailure object with failure details
-            
+
         Returns:
             True if alert was sent successfully
         """
         blocks = self._build_failure_blocks(failure)
-        
+
         try:
             if self.webhook_client:
                 response = self.webhook_client.send(
@@ -62,21 +61,21 @@ class SlackNotifier:
         except SlackApiError as e:
             logger.error(f"Failed to send Slack alert: {e}")
             return False
-        
+
         logger.warning("No Slack client configured")
         return False
 
     def send_sla_miss_alert(self, sla_miss: SLAMissEvent) -> bool:
         """Send an SLA miss alert to Slack.
-        
+
         Args:
             sla_miss: SLAMissEvent object with SLA miss details
-            
+
         Returns:
             True if alert was sent successfully
         """
         blocks = self._build_sla_miss_blocks(sla_miss)
-        
+
         try:
             if self.webhook_client:
                 response = self.webhook_client.send(
@@ -94,22 +93,22 @@ class SlackNotifier:
         except SlackApiError as e:
             logger.error(f"Failed to send Slack alert: {e}")
             return False
-        
+
         logger.warning("No Slack client configured")
         return False
 
     def send_batch_failure_summary(self, failures: List[DAGFailure]) -> bool:
         """Send a summary of multiple failures.
-        
+
         Args:
             failures: List of DAGFailure objects
-            
+
         Returns:
             True if summary was sent successfully
         """
         if not failures:
             return True
-        
+
         blocks = [
             {
                 "type": "header",
@@ -121,7 +120,7 @@ class SlackNotifier:
             },
             {"type": "divider"},
         ]
-        
+
         for failure in failures[:10]:  # Limit to 10 to avoid message size limits
             blocks.append({
                 "type": "section",
@@ -134,7 +133,7 @@ class SlackNotifier:
                     ),
                 }
             })
-        
+
         if len(failures) > 10:
             blocks.append({
                 "type": "context",
@@ -145,7 +144,7 @@ class SlackNotifier:
                     }
                 ]
             })
-        
+
         try:
             if self.webhook_client:
                 response = self.webhook_client.send(
@@ -163,7 +162,7 @@ class SlackNotifier:
         except SlackApiError as e:
             logger.error(f"Failed to send Slack summary: {e}")
             return False
-        
+
         return False
 
     def _build_failure_blocks(self, failure: DAGFailure) -> list:
@@ -174,7 +173,7 @@ class SlackNotifier:
         )
         if len(failure.failed_tasks) > 5:
             failed_tasks_text += f"\n...and {len(failure.failed_tasks) - 5} more"
-        
+
         airflow_url = self.config.airflow_base_url.rstrip("/")
         dag_link = f"{airflow_url}/dags/{failure.dag_id}/grid"
 
@@ -205,7 +204,7 @@ class SlackNotifier:
                 }
             },
         ]
-        
+
         return blocks
 
     def _build_sla_miss_blocks(self, sla_miss: SLAMissEvent) -> list:
@@ -229,7 +228,7 @@ class SlackNotifier:
                 ]
             },
         ]
-        
+
         if sla_miss.description:
             blocks.append({
                 "type": "section",
@@ -238,7 +237,7 @@ class SlackNotifier:
                     "text": f"*Description:*\n{sla_miss.description}",
                 }
             })
-        
+
         return blocks
 
     def send_threshold_alert(
@@ -249,13 +248,13 @@ class SlackNotifier:
         severity: str = "warning",
     ) -> bool:
         """Send a threshold breach alert to Slack.
-        
+
         Args:
             metric_name: Name of the metric
             current_value: Current metric value
             threshold: Threshold that was breached
             severity: Alert severity (info, warning, error, critical)
-            
+
         Returns:
             True if alert was sent successfully
         """
@@ -265,9 +264,9 @@ class SlackNotifier:
             "error": "🚨",
             "critical": "🔥",
         }
-        
+
         emoji = severity_emoji.get(severity, "⚠️")
-        
+
         blocks = [
             {
                 "type": "header",
@@ -287,7 +286,7 @@ class SlackNotifier:
                 ]
             },
         ]
-        
+
         try:
             if self.webhook_client:
                 response = self.webhook_client.send(
@@ -305,12 +304,12 @@ class SlackNotifier:
         except SlackApiError as e:
             logger.error(f"Failed to send Slack threshold alert: {e}")
             return False
-        
+
         return False
 
     def send_test_alert(self) -> bool:
         """Send a test alert to verify configuration.
-        
+
         Returns:
             True if test alert was sent successfully
         """
@@ -331,7 +330,7 @@ class SlackNotifier:
                 }
             },
         ]
-        
+
         try:
             if self.webhook_client:
                 response = self.webhook_client.send(
@@ -349,5 +348,5 @@ class SlackNotifier:
         except SlackApiError as e:
             logger.error(f"Failed to send Slack test alert: {e}")
             return False
-        
+
         return False

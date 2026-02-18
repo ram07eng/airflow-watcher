@@ -1,11 +1,11 @@
 """Alert Rules Configuration - Easy setup for alerting."""
 
-import logging
-from typing import List, Dict, Any, Optional
 import json
+import logging
 import os
+from typing import Dict, List, Optional
 
-from airflow_watcher.alerting import AlertRule, AlertSeverity, AlertChannel
+from airflow_watcher.alerting import AlertChannel, AlertRule, AlertSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -124,11 +124,11 @@ RULE_TEMPLATES = {
 
 def get_template_rules(template_name: str) -> List[AlertRule]:
     """Get alert rules from a predefined template.
-    
+
     Args:
-        template_name: One of: production_strict, production_balanced, 
+        template_name: One of: production_strict, production_balanced,
                        production_relaxed, development
-    
+
     Returns:
         List of AlertRule objects
     """
@@ -153,7 +153,7 @@ def create_custom_rule(
     tag_filter: Optional[str] = None,
 ) -> AlertRule:
     """Create a custom alert rule.
-    
+
     Args:
         name: Unique rule name
         metric: Metric to evaluate (e.g., "failures.total_24h")
@@ -165,7 +165,7 @@ def create_custom_rule(
         dag_filter: Regex pattern to filter DAG IDs
         owner_filter: Filter by DAG owner
         tag_filter: Filter by DAG tag
-        
+
     Returns:
         AlertRule object
     """
@@ -175,16 +175,16 @@ def create_custom_rule(
         "error": AlertSeverity.ERROR,
         "critical": AlertSeverity.CRITICAL,
     }
-    
+
     channel_map = {
         "slack": AlertChannel.SLACK,
         "email": AlertChannel.EMAIL,
         "pagerduty": AlertChannel.PAGERDUTY,
     }
-    
+
     channels = channels or ["slack"]
     alert_channels = [channel_map[c.lower()] for c in channels if c.lower() in channel_map]
-    
+
     return AlertRule(
         name=name,
         metric=metric,
@@ -201,29 +201,29 @@ def create_custom_rule(
 
 def load_rules_from_file(filepath: str) -> List[AlertRule]:
     """Load alert rules from a JSON file.
-    
+
     Args:
         filepath: Path to JSON file
-        
+
     Returns:
         List of AlertRule objects
     """
     if not os.path.exists(filepath):
         logger.warning(f"Rules file not found: {filepath}")
         return []
-    
+
     try:
         with open(filepath, "r") as f:
             rules_data = json.load(f)
-        
+
         rules = []
         for rule_dict in rules_data:
             rule = create_custom_rule(**rule_dict)
             rules.append(rule)
-        
+
         logger.info(f"Loaded {len(rules)} alert rules from {filepath}")
         return rules
-        
+
     except Exception as e:
         logger.error(f"Failed to load rules from {filepath}: {e}")
         return []
@@ -231,7 +231,7 @@ def load_rules_from_file(filepath: str) -> List[AlertRule]:
 
 def save_rules_to_file(rules: List[AlertRule], filepath: str):
     """Save alert rules to a JSON file.
-    
+
     Args:
         rules: List of AlertRule objects
         filepath: Path to save JSON file
@@ -250,7 +250,7 @@ def save_rules_to_file(rules: List[AlertRule], filepath: str):
             "owner_filter": rule.owner_filter,
             "tag_filter": rule.tag_filter,
         })
-    
+
     try:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, "w") as f:
@@ -262,36 +262,36 @@ def save_rules_to_file(rules: List[AlertRule], filepath: str):
 
 def load_rules_from_env() -> List[AlertRule]:
     """Load alert rules from environment variables.
-    
+
     Environment variable format:
         WATCHER_ALERT_RULE_1='{"name":"rule1","metric":"failures.total_24h",...}'
         WATCHER_ALERT_RULE_2='{"name":"rule2",...}'
-    
+
     Returns:
         List of AlertRule objects
     """
     rules = []
     i = 1
-    
+
     while True:
         env_var = f"WATCHER_ALERT_RULE_{i}"
         rule_json = os.environ.get(env_var)
-        
+
         if not rule_json:
             break
-        
+
         try:
             rule_dict = json.loads(rule_json)
             rule = create_custom_rule(**rule_dict)
             rules.append(rule)
         except Exception as e:
             logger.warning(f"Failed to parse {env_var}: {e}")
-        
+
         i += 1
-    
+
     if rules:
         logger.info(f"Loaded {len(rules)} alert rules from environment variables")
-    
+
     return rules
 
 

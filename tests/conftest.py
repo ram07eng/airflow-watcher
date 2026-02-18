@@ -1,8 +1,8 @@
 """Pytest configuration for Airflow Watcher tests."""
 
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
