@@ -3,9 +3,8 @@
 from airflow.plugins_manager import AirflowPlugin
 from flask import Blueprint
 
-from airflow_watcher.views.dashboard import WatcherDashboardView
 from airflow_watcher.views.api import watcher_api_blueprint
-
+from airflow_watcher.views.dashboard import WatcherDashboardView
 
 # Create Flask Blueprint for the UI
 watcher_bp = Blueprint(

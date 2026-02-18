@@ -8,7 +8,7 @@ from typing import Optional
 @dataclass
 class SLAMissEvent:
     """Represents an SLA miss event."""
-    
+
     dag_id: str
     task_id: str
     execution_date: datetime
@@ -16,7 +16,7 @@ class SLAMissEvent:
     email_sent: bool = False
     notification_sent: bool = False
     description: Optional[str] = None
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
@@ -33,7 +33,7 @@ class SLAMissEvent:
 @dataclass
 class SLADelayWarning:
     """Represents a warning for potential SLA delay."""
-    
+
     dag_id: str
     run_id: str
     execution_date: datetime
@@ -42,7 +42,7 @@ class SLADelayWarning:
     threshold_minutes: float
     risk_level: str  # "low", "medium", "high"
     estimated_completion: Optional[datetime] = None
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
