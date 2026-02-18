@@ -36,12 +36,14 @@ class DAGHealthMonitor:
 
         import_errors = []
         for error in errors:
-            import_errors.append({
-                "filename": error.filename,
-                "timestamp": error.timestamp.isoformat() if error.timestamp else None,
-                "stacktrace": error.stacktrace[:500] if error.stacktrace else None,  # Truncate
-                "full_stacktrace": error.stacktrace,
-            })
+            import_errors.append(
+                {
+                    "filename": error.filename,
+                    "timestamp": error.timestamp.isoformat() if error.timestamp else None,
+                    "stacktrace": error.stacktrace[:500] if error.stacktrace else None,  # Truncate
+                    "full_stacktrace": error.stacktrace,
+                }
+            )
 
         return import_errors
 
@@ -59,29 +61,45 @@ class DAGHealthMonitor:
         total_dags = session.query(DagModel).count()
 
         # Active DAGs
-        active_dags = session.query(DagModel).filter(
-            DagModel.is_active,
-        ).count()
+        active_dags = (
+            session.query(DagModel)
+            .filter(
+                DagModel.is_active,
+            )
+            .count()
+        )
 
         # Paused DAGs
-        paused_dags = session.query(DagModel).filter(
-            DagModel.is_paused,
-        ).count()
+        paused_dags = (
+            session.query(DagModel)
+            .filter(
+                DagModel.is_paused,
+            )
+            .count()
+        )
 
         # DAGs with import errors
         import_error_count = session.query(AirflowImportError).count()
 
         # Running DAG runs
-        running_runs = session.query(DagRun).filter(
-            DagRun.state == "running",
-        ).count()
+        running_runs = (
+            session.query(DagRun)
+            .filter(
+                DagRun.state == "running",
+            )
+            .count()
+        )
 
         # Recent failures (24h)
         cutoff = timezone.utcnow() - timedelta(hours=24)
-        recent_failures = session.query(DagRun).filter(
-            DagRun.state == "failed",
-            DagRun.end_date >= cutoff,
-        ).count()
+        recent_failures = (
+            session.query(DagRun)
+            .filter(
+                DagRun.state == "failed",
+                DagRun.end_date >= cutoff,
+            )
+            .count()
+        )
 
         return {
             "total_dags": total_dags,
@@ -90,9 +108,7 @@ class DAGHealthMonitor:
             "dags_with_errors": import_error_count,
             "currently_running": running_runs,
             "recent_failures_24h": recent_failures,
-            "health_score": self._calculate_health_score(
-                total_dags, import_error_count, recent_failures
-            ),
+            "health_score": self._calculate_health_score(total_dags, import_error_count, recent_failures),
             "timestamp": timezone.utcnow().isoformat(),
         }
 
@@ -122,10 +138,10 @@ class DAGHealthMonitor:
             return 100
 
         defaults = {
-            "error_weight": 15,   # points deducted per import error
-            "error_cap": 45,      # max deduction from errors
+            "error_weight": 15,  # points deducted per import error
+            "error_cap": 45,  # max deduction from errors
             "failure_weight": 1,  # points deducted per failure
-            "failure_cap": 40,    # max deduction from failures
+            "failure_cap": 40,  # max deduction from failures
         }
         w = {**defaults, **(weights or {})}
 
@@ -172,16 +188,18 @@ class DAGHealthMonitor:
             # Calculate depth (longest path)
             max_depth = self._calculate_dag_depth(dag)
 
-            complexity_data.append({
-                "dag_id": dag_id,
-                "task_count": task_count,
-                "dependency_count": dependency_count,
-                "max_depth": max_depth,
-                "avg_dependencies_per_task": round(dependency_count / task_count, 2) if task_count > 0 else 0,
-                "schedule_interval": str(dag.schedule_interval),
-                "is_paused": dag.is_paused,
-                "tags": [t.name for t in dag.tags] if dag.tags else [],
-            })
+            complexity_data.append(
+                {
+                    "dag_id": dag_id,
+                    "task_count": task_count,
+                    "dependency_count": dependency_count,
+                    "max_depth": max_depth,
+                    "avg_dependencies_per_task": round(dependency_count / task_count, 2) if task_count > 0 else 0,
+                    "schedule_interval": str(dag.schedule_interval),
+                    "is_paused": dag.is_paused,
+                    "tags": [t.name for t in dag.tags] if dag.tags else [],
+                }
+            )
 
         return sorted(complexity_data, key=lambda x: x["task_count"], reverse=True)
 
@@ -208,10 +226,7 @@ class DAGHealthMonitor:
             if not task.downstream_list:
                 return 1
 
-            return 1 + max(
-                get_depth(downstream, visited.copy())
-                for downstream in task.downstream_list
-            )
+            return 1 + max(get_depth(downstream, visited.copy()) for downstream in task.downstream_list)
 
         return max(get_depth(root) for root in roots)
 
@@ -235,15 +250,24 @@ class DAGHealthMonitor:
         # Get DAGs that haven't run recently
         inactive_dags = []
 
-        all_dags = session.query(DagModel).filter(
-            DagModel.is_active,
-        ).all()
+        all_dags = (
+            session.query(DagModel)
+            .filter(
+                DagModel.is_active,
+            )
+            .all()
+        )
 
         for dag in all_dags:
             # Get most recent run
-            latest_run = session.query(DagRun).filter(
-                DagRun.dag_id == dag.dag_id,
-            ).order_by(DagRun.execution_date.desc()).first()
+            latest_run = (
+                session.query(DagRun)
+                .filter(
+                    DagRun.dag_id == dag.dag_id,
+                )
+                .order_by(DagRun.execution_date.desc())
+                .first()
+            )
 
             last_run_date = latest_run.execution_date if latest_run else None
 
@@ -252,17 +276,17 @@ class DAGHealthMonitor:
                 if latest_run:
                     days_inactive = (timezone.utcnow() - latest_run.execution_date).days
 
-                inactive_dags.append({
-                    "dag_id": dag.dag_id,
-                    "last_run": last_run_date.isoformat() if last_run_date else None,
-                    "days_inactive": days_inactive,
-                    "is_paused": dag.is_paused,
-                    "schedule_interval": str(dag.schedule_interval) if dag.schedule_interval else None,
-                    "recommendation": "Consider pausing or removing" if days_inactive and days_inactive > 60 else "Review",
-                })
+                inactive_dags.append(
+                    {
+                        "dag_id": dag.dag_id,
+                        "last_run": last_run_date.isoformat() if last_run_date else None,
+                        "days_inactive": days_inactive,
+                        "is_paused": dag.is_paused,
+                        "schedule_interval": str(dag.schedule_interval) if dag.schedule_interval else None,
+                        "recommendation": "Consider pausing or removing"
+                        if days_inactive and days_inactive > 60
+                        else "Review",
+                    }
+                )
 
-        return sorted(
-            inactive_dags,
-            key=lambda x: x["days_inactive"] or 999,
-            reverse=True
-        )
+        return sorted(inactive_dags, key=lambda x: x["days_inactive"] or 999, reverse=True)

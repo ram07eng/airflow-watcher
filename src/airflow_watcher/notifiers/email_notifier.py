@@ -131,8 +131,7 @@ class EmailNotifier:
     def _build_failure_html(self, failure: DAGFailure) -> str:
         """Build HTML content for a failure alert."""
         failed_tasks_html = "".join(
-            f"<li><code>{t.task_id}</code> (attempt {t.try_number}/{t.max_tries})</li>"
-            for t in failure.failed_tasks
+            f"<li><code>{t.task_id}</code> (attempt {t.try_number}/{t.max_tries})</li>" for t in failure.failed_tasks
         )
 
         return f"""

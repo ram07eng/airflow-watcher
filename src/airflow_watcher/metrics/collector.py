@@ -111,9 +111,7 @@ class MetricsCollector:
 
             # Scheduling metrics
             scheduling_monitor = SchedulingMonitor()
-            scheduling_lag = scheduling_monitor.get_scheduling_lag(
-                lookback_hours=24, lag_threshold_minutes=10
-            )
+            scheduling_lag = scheduling_monitor.get_scheduling_lag(lookback_hours=24, lag_threshold_minutes=10)
             metrics.missed_schedules_24h = scheduling_lag.get("delayed_count", 0)
             stale = scheduling_monitor.get_stale_dags(expected_interval_hours=24)
             metrics.delayed_dags = len(stale)
@@ -136,9 +134,7 @@ class MetricsCollector:
 
             # Calculate failure rate
             if metrics.total_dags > 0:
-                metrics.failure_rate_percent = round(
-                    (metrics.unique_dag_failures_24h / metrics.total_dags) * 100, 2
-                )
+                metrics.failure_rate_percent = round((metrics.unique_dag_failures_24h / metrics.total_dags) * 100, 2)
 
             metrics.collected_at = timezone.utcnow()
             self._last_metrics = metrics

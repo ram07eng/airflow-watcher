@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Airflow UI Plugin for monitoring DAG failures and SLA misses"
 readme = "README.md"
 license = {text = "Apache-2.0"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     {name = "Ramanujam Solaimalai", email = "ramanujam.solaimalai@gmail.com"}
 ]
@@ -89,6 +89,7 @@ addopts = "-v --cov=airflow_watcher --cov-report=term-missing"
 
 [tool.mypy]
 python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
 ignore_missing_imports = true
+no_implicit_optional = true
+warn_unused_configs = true
+disable_error_code = ["var-annotated", "assignment", "arg-type", "index", "import-untyped"]

@@ -63,13 +63,15 @@ class SchedulingMonitor:
             lags.append(lag_minutes)
 
             if lag_minutes > lag_threshold_minutes:
-                delayed_dags.append({
-                    "dag_id": dag_run.dag_id,
-                    "run_id": dag_run.run_id,
-                    "scheduled_time": dag_run.execution_date.isoformat(),
-                    "actual_start": dag_run.start_date.isoformat(),
-                    "lag_minutes": round(lag_minutes, 2),
-                })
+                delayed_dags.append(
+                    {
+                        "dag_id": dag_run.dag_id,
+                        "run_id": dag_run.run_id,
+                        "scheduled_time": dag_run.execution_date.isoformat(),
+                        "actual_start": dag_run.start_date.isoformat(),
+                        "lag_minutes": round(lag_minutes, 2),
+                    }
+                )
 
         if not lags:
             return {
@@ -117,14 +119,22 @@ class SchedulingMonitor:
             Dictionary with queue status
         """
         # Tasks in queued state
-        queued = session.query(TaskInstance).filter(
-            TaskInstance.state == TaskInstanceState.QUEUED,
-        ).all()
+        queued = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.state == TaskInstanceState.QUEUED,
+            )
+            .all()
+        )
 
         # Tasks in scheduled state (waiting to be picked up)
-        scheduled = session.query(TaskInstance).filter(
-            TaskInstance.state == TaskInstanceState.SCHEDULED,
-        ).all()
+        scheduled = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.state == TaskInstanceState.SCHEDULED,
+            )
+            .all()
+        )
 
         current_time = timezone.utcnow()
 
@@ -134,31 +144,31 @@ class SchedulingMonitor:
             if ti.queued_dttm:
                 wait_time = (current_time - ti.queued_dttm).total_seconds() / 60
 
-            queued_details.append({
-                "dag_id": ti.dag_id,
-                "task_id": ti.task_id,
-                "run_id": ti.run_id,
-                "queued_at": ti.queued_dttm.isoformat() if ti.queued_dttm else None,
-                "wait_minutes": round(wait_time, 2) if wait_time else None,
-                "pool": ti.pool,
-                "priority_weight": ti.priority_weight,
-            })
+            queued_details.append(
+                {
+                    "dag_id": ti.dag_id,
+                    "task_id": ti.task_id,
+                    "run_id": ti.run_id,
+                    "queued_at": ti.queued_dttm.isoformat() if ti.queued_dttm else None,
+                    "wait_minutes": round(wait_time, 2) if wait_time else None,
+                    "pool": ti.pool,
+                    "priority_weight": ti.priority_weight,
+                }
+            )
 
         scheduled_details = []
         for ti in scheduled:
-            scheduled_details.append({
-                "dag_id": ti.dag_id,
-                "task_id": ti.task_id,
-                "run_id": ti.run_id,
-                "pool": ti.pool,
-            })
+            scheduled_details.append(
+                {
+                    "dag_id": ti.dag_id,
+                    "task_id": ti.task_id,
+                    "run_id": ti.run_id,
+                    "pool": ti.pool,
+                }
+            )
 
         # Sort by wait time
-        queued_details = sorted(
-            queued_details,
-            key=lambda x: x["wait_minutes"] or 0,
-            reverse=True
-        )
+        queued_details = sorted(queued_details, key=lambda x: x["wait_minutes"] or 0, reverse=True)
 
         return {
             "queued_count": len(queued),
@@ -187,29 +197,39 @@ class SchedulingMonitor:
         pool_stats = []
         for pool in pools:
             # Count running tasks in this pool
-            running = session.query(TaskInstance).filter(
-                TaskInstance.pool == pool.pool,
-                TaskInstance.state == TaskInstanceState.RUNNING,
-            ).count()
+            running = (
+                session.query(TaskInstance)
+                .filter(
+                    TaskInstance.pool == pool.pool,
+                    TaskInstance.state == TaskInstanceState.RUNNING,
+                )
+                .count()
+            )
 
             # Count queued tasks in this pool
-            queued = session.query(TaskInstance).filter(
-                TaskInstance.pool == pool.pool,
-                TaskInstance.state == TaskInstanceState.QUEUED,
-            ).count()
+            queued = (
+                session.query(TaskInstance)
+                .filter(
+                    TaskInstance.pool == pool.pool,
+                    TaskInstance.state == TaskInstanceState.QUEUED,
+                )
+                .count()
+            )
 
             utilization = (running / pool.slots * 100) if pool.slots > 0 else 0
 
-            pool_stats.append({
-                "pool_name": pool.pool,
-                "slots": pool.slots,
-                "running": running,
-                "queued": queued,
-                "available": max(0, pool.slots - running),
-                "utilization_percent": round(utilization, 2),
-                "is_saturated": running >= pool.slots,
-                "description": pool.description,
-            })
+            pool_stats.append(
+                {
+                    "pool_name": pool.pool,
+                    "slots": pool.slots,
+                    "running": running,
+                    "queued": queued,
+                    "available": max(0, pool.slots - running),
+                    "utilization_percent": round(utilization, 2),
+                    "is_saturated": running >= pool.slots,
+                    "description": pool.description,
+                }
+            )
 
         return sorted(pool_stats, key=lambda x: x["utilization_percent"], reverse=True)
 
@@ -231,39 +251,52 @@ class SchedulingMonitor:
         cutoff_time = timezone.utcnow() - timedelta(hours=expected_interval_hours)
 
         # Get all active DAGs
-        active_dags = session.query(DagModel).filter(
-            not DagModel.is_paused,
-            DagModel.is_active,
-        ).all()
+        active_dags = (
+            session.query(DagModel)
+            .filter(
+                not DagModel.is_paused,
+                DagModel.is_active,
+            )
+            .all()
+        )
 
         stale_dags = []
         current_time = timezone.utcnow()
 
         for dag in active_dags:
             # Get the most recent run
-            latest_run = session.query(DagRun).filter(
-                DagRun.dag_id == dag.dag_id,
-            ).order_by(DagRun.execution_date.desc()).first()
+            latest_run = (
+                session.query(DagRun)
+                .filter(
+                    DagRun.dag_id == dag.dag_id,
+                )
+                .order_by(DagRun.execution_date.desc())
+                .first()
+            )
 
             if not latest_run:
                 # Never run
-                stale_dags.append({
-                    "dag_id": dag.dag_id,
-                    "last_run": None,
-                    "hours_since_run": None,
-                    "status": "never_run",
-                    "schedule_interval": str(dag.schedule_interval),
-                })
+                stale_dags.append(
+                    {
+                        "dag_id": dag.dag_id,
+                        "last_run": None,
+                        "hours_since_run": None,
+                        "status": "never_run",
+                        "schedule_interval": str(dag.schedule_interval),
+                    }
+                )
             elif latest_run.execution_date < cutoff_time:
                 hours_since = (current_time - latest_run.execution_date).total_seconds() / 3600
-                stale_dags.append({
-                    "dag_id": dag.dag_id,
-                    "last_run": latest_run.execution_date.isoformat(),
-                    "last_run_state": str(latest_run.state),
-                    "hours_since_run": round(hours_since, 2),
-                    "status": "stale",
-                    "schedule_interval": str(dag.schedule_interval),
-                })
+                stale_dags.append(
+                    {
+                        "dag_id": dag.dag_id,
+                        "last_run": latest_run.execution_date.isoformat(),
+                        "last_run_state": str(latest_run.state),
+                        "hours_since_run": round(hours_since, 2),
+                        "status": "stale",
+                        "schedule_interval": str(dag.schedule_interval),
+                    }
+                )
 
         return sorted(stale_dags, key=lambda x: x.get("hours_since_run") or 999999, reverse=True)
 
@@ -278,35 +311,46 @@ class SchedulingMonitor:
             Dictionary with concurrent run information
         """
         # Find DAGs with multiple running instances
-        concurrent = session.query(
-            DagRun.dag_id,
-            func.count(DagRun.dag_id).label("running_count"),
-        ).filter(
-            DagRun.state == DagRunState.RUNNING,
-        ).group_by(DagRun.dag_id).having(
-            func.count(DagRun.dag_id) > 1
-        ).all()
+        concurrent = (
+            session.query(
+                DagRun.dag_id,
+                func.count(DagRun.dag_id).label("running_count"),
+            )
+            .filter(
+                DagRun.state == DagRunState.RUNNING,
+            )
+            .group_by(DagRun.dag_id)
+            .having(func.count(DagRun.dag_id) > 1)
+            .all()
+        )
 
         concurrent_dags = []
         for dag_id, count in concurrent:
             # Get the running instances
-            runs = session.query(DagRun).filter(
-                DagRun.dag_id == dag_id,
-                DagRun.state == DagRunState.RUNNING,
-            ).order_by(DagRun.execution_date.desc()).all()
+            runs = (
+                session.query(DagRun)
+                .filter(
+                    DagRun.dag_id == dag_id,
+                    DagRun.state == DagRunState.RUNNING,
+                )
+                .order_by(DagRun.execution_date.desc())
+                .all()
+            )
 
-            concurrent_dags.append({
-                "dag_id": dag_id,
-                "running_count": count,
-                "runs": [
-                    {
-                        "run_id": r.run_id,
-                        "execution_date": r.execution_date.isoformat(),
-                        "start_date": r.start_date.isoformat() if r.start_date else None,
-                    }
-                    for r in runs
-                ],
-            })
+            concurrent_dags.append(
+                {
+                    "dag_id": dag_id,
+                    "running_count": count,
+                    "runs": [
+                        {
+                            "run_id": r.run_id,
+                            "execution_date": r.execution_date.isoformat(),
+                            "start_date": r.start_date.isoformat() if r.start_date else None,
+                        }
+                        for r in runs
+                    ],
+                }
+            )
 
         return {
             "dags_with_concurrent_runs": len(concurrent_dags),

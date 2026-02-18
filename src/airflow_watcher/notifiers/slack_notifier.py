@@ -116,34 +116,38 @@ class SlackNotifier:
                     "type": "plain_text",
                     "text": f"🚨 {len(failures)} DAG Failures Summary",
                     "emoji": True,
-                }
+                },
             },
             {"type": "divider"},
         ]
 
         for failure in failures[:10]:  # Limit to 10 to avoid message size limits
-            blocks.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": (
-                        f"*{failure.dag_id}*\n"
-                        f"Run: `{failure.run_id}`\n"
-                        f"Failed Tasks: {len(failure.failed_tasks)}"
-                    ),
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f"*{failure.dag_id}*\n"
+                            f"Run: `{failure.run_id}`\n"
+                            f"Failed Tasks: {len(failure.failed_tasks)}"
+                        ),
+                    },
                 }
-            })
+            )
 
         if len(failures) > 10:
-            blocks.append({
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"...and {len(failures) - 10} more failures",
-                    }
-                ]
-            })
+            blocks.append(
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"...and {len(failures) - 10} more failures",
+                        }
+                    ],
+                }
+            )
 
         try:
             if self.webhook_client:
@@ -168,8 +172,7 @@ class SlackNotifier:
     def _build_failure_blocks(self, failure: DAGFailure) -> list:
         """Build Slack blocks for a failure alert."""
         failed_tasks_text = "\n".join(
-            [f"• `{t.task_id}` (attempt {t.try_number}/{t.max_tries})"
-             for t in failure.failed_tasks[:5]]
+            [f"• `{t.task_id}` (attempt {t.try_number}/{t.max_tries})" for t in failure.failed_tasks[:5]]
         )
         if len(failure.failed_tasks) > 5:
             failed_tasks_text += f"\n...and {len(failure.failed_tasks) - 5} more"
@@ -184,7 +187,7 @@ class SlackNotifier:
                     "type": "plain_text",
                     "text": "🚨 DAG Failure Alert",
                     "emoji": True,
-                }
+                },
             },
             {
                 "type": "section",
@@ -193,15 +196,17 @@ class SlackNotifier:
                     {"type": "mrkdwn", "text": f"*Run ID:*\n`{failure.run_id}`"},
                     {"type": "mrkdwn", "text": f"*Execution Date:*\n{failure.execution_date}"},
                     {"type": "mrkdwn", "text": f"*Failed Tasks:*\n{len(failure.failed_tasks)}"},
-                ]
+                ],
             },
             {"type": "divider"},
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Failed Tasks:*\n{failed_tasks_text}" if failed_tasks_text else "*No task details available*",
-                }
+                    "text": f"*Failed Tasks:*\n{failed_tasks_text}"
+                    if failed_tasks_text
+                    else "*No task details available*",
+                },
             },
         ]
 
@@ -216,7 +221,7 @@ class SlackNotifier:
                     "type": "plain_text",
                     "text": "⏰ SLA Miss Alert",
                     "emoji": True,
-                }
+                },
             },
             {
                 "type": "section",
@@ -225,18 +230,20 @@ class SlackNotifier:
                     {"type": "mrkdwn", "text": f"*Task:*\n`{sla_miss.task_id}`"},
                     {"type": "mrkdwn", "text": f"*Execution Date:*\n{sla_miss.execution_date}"},
                     {"type": "mrkdwn", "text": f"*Timestamp:*\n{sla_miss.timestamp}"},
-                ]
+                ],
             },
         ]
 
         if sla_miss.description:
-            blocks.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*Description:*\n{sla_miss.description}",
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Description:*\n{sla_miss.description}",
+                    },
                 }
-            })
+            )
 
         return blocks
 
@@ -274,7 +281,7 @@ class SlackNotifier:
                     "type": "plain_text",
                     "text": f"{emoji} Threshold Alert",
                     "emoji": True,
-                }
+                },
             },
             {
                 "type": "section",
@@ -283,7 +290,7 @@ class SlackNotifier:
                     {"type": "mrkdwn", "text": f"*Severity:*\n{severity.upper()}"},
                     {"type": "mrkdwn", "text": f"*Current Value:*\n{current_value}"},
                     {"type": "mrkdwn", "text": f"*Threshold:*\n{threshold}"},
-                ]
+                ],
             },
         ]
 
@@ -320,14 +327,14 @@ class SlackNotifier:
                     "type": "plain_text",
                     "text": "✅ Airflow Watcher Test Alert",
                     "emoji": True,
-                }
+                },
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
                     "text": "This is a test alert from Airflow Watcher. If you see this, Slack notifications are configured correctly!",
-                }
+                },
             },
         ]
 

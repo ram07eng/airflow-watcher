@@ -1,7 +1,12 @@
 """Prometheus Exporter - Exposes metrics in Prometheus format."""
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+if TYPE_CHECKING:
+    from airflow_watcher.config import WatcherConfig
 
 from flask import Blueprint, Response
 

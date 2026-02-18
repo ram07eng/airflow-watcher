@@ -56,7 +56,9 @@ class WatcherConfig:
     # General settings
     airflow_base_url: str = "http://localhost:8080"
     alert_rules_file: Optional[str] = None
-    alert_template: str = "production_balanced"  # production_strict, production_balanced, production_relaxed, development
+    alert_template: str = (
+        "production_balanced"  # production_strict, production_balanced, production_relaxed, development
+    )
 
     @classmethod
     def from_airflow_config(cls) -> "WatcherConfig":
@@ -87,7 +89,9 @@ class WatcherConfig:
             # Monitoring settings
             config.failure_lookback_hours = conf.getint("airflow_watcher", "failure_lookback_hours", fallback=24)
             config.sla_check_interval_minutes = conf.getint("airflow_watcher", "sla_check_interval_minutes", fallback=5)
-            config.sla_warning_threshold_minutes = conf.getint("airflow_watcher", "sla_warning_threshold_minutes", fallback=30)
+            config.sla_warning_threshold_minutes = conf.getint(
+                "airflow_watcher", "sla_warning_threshold_minutes", fallback=30
+            )
 
             # Alert settings
             config.alert_on_first_failure = conf.getboolean("airflow_watcher", "alert_on_first_failure", fallback=True)

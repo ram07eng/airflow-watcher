@@ -1,7 +1,6 @@
 """Tests for DAGHealthMonitor."""
 
 
-
 from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
 
 
@@ -69,4 +68,3 @@ class TestDAGHealthMonitor:
         # 10 errors out of 10 DAGs - should hit the error_cap
         score = monitor._calculate_health_score(10, 10, 0)
         assert 0 <= score <= 100
-

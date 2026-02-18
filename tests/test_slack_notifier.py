@@ -21,9 +21,7 @@ class TestSlackNotifier:
 
     def test_init_with_webhook_url(self):
         """Test initialization with webhook URL."""
-        config = WatcherConfig(
-            slack_webhook_url="https://hooks.slack.com/services/xxx/yyy/zzz"
-        )
+        config = WatcherConfig(slack_webhook_url="https://hooks.slack.com/services/xxx/yyy/zzz")
         notifier = SlackNotifier(config=config)
         assert notifier.webhook_client is not None
 
@@ -80,9 +78,7 @@ class TestSlackNotifier:
         mock_response.status_code = 200
         mock_webhook_client.return_value.send.return_value = mock_response
 
-        config = WatcherConfig(
-            slack_webhook_url="https://hooks.slack.com/services/xxx"
-        )
+        config = WatcherConfig(slack_webhook_url="https://hooks.slack.com/services/xxx")
         notifier = SlackNotifier(config=config)
         notifier.webhook_client = mock_webhook_client.return_value
 

@@ -130,42 +130,61 @@ class DAGFailureMonitor:
         cutoff_time = timezone.utcnow() - timedelta(hours=lookback_hours)
 
         # Total DAG runs
-        total_runs = session.query(DagRun).filter(
-            DagRun.end_date >= cutoff_time,
-        ).count()
+        total_runs = (
+            session.query(DagRun)
+            .filter(
+                DagRun.end_date >= cutoff_time,
+            )
+            .count()
+        )
 
         # Failed DAG runs
-        failed_runs = session.query(DagRun).filter(
-            DagRun.state == DagRunState.FAILED,
-            DagRun.end_date >= cutoff_time,
-        ).count()
+        failed_runs = (
+            session.query(DagRun)
+            .filter(
+                DagRun.state == DagRunState.FAILED,
+                DagRun.end_date >= cutoff_time,
+            )
+            .count()
+        )
 
         # Successful DAG runs
-        success_runs = session.query(DagRun).filter(
-            DagRun.state == DagRunState.SUCCESS,
-            DagRun.end_date >= cutoff_time,
-        ).count()
+        success_runs = (
+            session.query(DagRun)
+            .filter(
+                DagRun.state == DagRunState.SUCCESS,
+                DagRun.end_date >= cutoff_time,
+            )
+            .count()
+        )
 
         # Total task failures
-        total_task_failures = session.query(TaskInstance).filter(
-            TaskInstance.state == TaskInstanceState.FAILED,
-            TaskInstance.end_date >= cutoff_time,
-        ).count()
+        total_task_failures = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.state == TaskInstanceState.FAILED,
+                TaskInstance.end_date >= cutoff_time,
+            )
+            .count()
+        )
 
         # Failure rate
         failure_rate = (failed_runs / total_runs * 100) if total_runs > 0 else 0
 
         # Most failing DAGs
         from sqlalchemy import func
-        most_failing = session.query(
-            DagRun.dag_id,
-            func.count(DagRun.dag_id).label("failure_count")
-        ).filter(
-            DagRun.state == DagRunState.FAILED,
-            DagRun.end_date >= cutoff_time,
-        ).group_by(DagRun.dag_id).order_by(
-            func.count(DagRun.dag_id).desc()
-        ).limit(10).all()
+
+        most_failing = (
+            session.query(DagRun.dag_id, func.count(DagRun.dag_id).label("failure_count"))
+            .filter(
+                DagRun.state == DagRunState.FAILED,
+                DagRun.end_date >= cutoff_time,
+            )
+            .group_by(DagRun.dag_id)
+            .order_by(func.count(DagRun.dag_id).desc())
+            .limit(10)
+            .all()
+        )
 
         return {
             "period_hours": lookback_hours,
@@ -174,10 +193,7 @@ class DAGFailureMonitor:
             "success_runs": success_runs,
             "failure_rate": round(failure_rate, 2),
             "total_task_failures": total_task_failures,
-            "most_failing_dags": [
-                {"dag_id": dag_id, "failure_count": count}
-                for dag_id, count in most_failing
-            ],
+            "most_failing_dags": [{"dag_id": dag_id, "failure_count": count} for dag_id, count in most_failing],
             "timestamp": timezone.utcnow().isoformat(),
         }
 
@@ -194,16 +210,19 @@ class DAGFailureMonitor:
         from sqlalchemy import func
 
         # Get the latest run status for each DAG
-        subquery = session.query(
-            DagRun.dag_id,
-            func.max(DagRun.execution_date).label("latest_execution")
-        ).group_by(DagRun.dag_id).subquery()
+        subquery = (
+            session.query(DagRun.dag_id, func.max(DagRun.execution_date).label("latest_execution"))
+            .group_by(DagRun.dag_id)
+            .subquery()
+        )
 
-        latest_runs = session.query(DagRun).join(
-            subquery,
-            (DagRun.dag_id == subquery.c.dag_id) &
-            (DagRun.execution_date == subquery.c.latest_execution)
-        ).all()
+        latest_runs = (
+            session.query(DagRun)
+            .join(
+                subquery, (DagRun.dag_id == subquery.c.dag_id) & (DagRun.execution_date == subquery.c.latest_execution)
+            )
+            .all()
+        )
 
         health_status = {
             "healthy": [],
