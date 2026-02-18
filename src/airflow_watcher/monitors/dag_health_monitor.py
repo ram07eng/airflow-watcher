@@ -102,30 +102,47 @@ class DAGHealthMonitor:
         total_dags: int,
         error_count: int,
         failure_count: int,
+        weights: dict = None,
     ) -> int:
         """Calculate overall health score (0-100).
-        
+
+        Uses a weighted scoring model. Weights can be customised via the
+        ``weights`` argument (keys: ``error_weight``, ``failure_weight``,
+        ``error_cap``, ``failure_cap``).
+
         Args:
             total_dags: Total number of DAGs
-            error_count: Number of DAGs with errors
-            failure_count: Number of recent failures
-            
+            error_count: Number of DAGs with import/parse errors
+            failure_count: Number of recent failures in the last 24 h
+            weights: Optional dict to override default scoring weights
+
         Returns:
             Health score from 0-100
         """
         if total_dags == 0:
             return 100
-        
-        # Start with 100
+
+        defaults = {
+            "error_weight": 15,   # points deducted per import error
+            "error_cap": 45,      # max deduction from errors
+            "failure_weight": 1,  # points deducted per failure
+            "failure_cap": 40,    # max deduction from failures
+        }
+        w = {**defaults, **(weights or {})}
+
         score = 100
-        
-        # Deduct for import errors (10 points each, max 30)
-        score -= min(error_count * 10, 30)
-        
-        # Deduct for failures (2 points each, max 40)
-        score -= min(failure_count * 2, 40)
-        
-        return max(0, score)
+
+        # Proportional error penalty (scales with DAG count)
+        error_ratio = error_count / total_dags
+        error_deduction = min(error_ratio * w["error_weight"] * 100, w["error_cap"])
+        score -= error_deduction
+
+        # Proportional failure penalty
+        failure_ratio = failure_count / total_dags
+        failure_deduction = min(failure_ratio * w["failure_weight"] * 100, w["failure_cap"])
+        score -= failure_deduction
+
+        return max(0, round(score))
 
     @provide_session
     def get_dag_complexity_analysis(self, session: Session = None) -> List[Dict]:

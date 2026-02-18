@@ -175,6 +175,9 @@ class SlackNotifier:
         if len(failure.failed_tasks) > 5:
             failed_tasks_text += f"\n...and {len(failure.failed_tasks) - 5} more"
         
+        airflow_url = self.config.airflow_base_url.rstrip("/")
+        dag_link = f"{airflow_url}/dags/{failure.dag_id}/grid"
+
         blocks = [
             {
                 "type": "header",
@@ -187,7 +190,7 @@ class SlackNotifier:
             {
                 "type": "section",
                 "fields": [
-                    {"type": "mrkdwn", "text": f"*DAG:*\n`{failure.dag_id}`"},
+                    {"type": "mrkdwn", "text": f"*DAG:*\n<{dag_link}|`{failure.dag_id}`>"},
                     {"type": "mrkdwn", "text": f"*Run ID:*\n`{failure.run_id}`"},
                     {"type": "mrkdwn", "text": f"*Execution Date:*\n{failure.execution_date}"},
                     {"type": "mrkdwn", "text": f"*Failed Tasks:*\n{len(failure.failed_tasks)}"},

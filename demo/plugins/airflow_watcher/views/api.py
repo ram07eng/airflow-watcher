@@ -98,16 +98,40 @@ def get_sla_stats():
 
 @watcher_api_blueprint.route("/health", methods=["GET"])
 def get_health():
-    """Get DAG health status via API."""
+    """Health check endpoint - returns overall system health summary.
+
+    Suitable for external monitoring tools (e.g. Datadog, Prometheus alertmanager,
+    uptime checkers) to poll. Returns HTTP 200 when healthy, 503 when degraded.
+    """
+    dag_monitor = DAGHealthMonitor()
     failure_monitor = DAGFailureMonitor()
-    
-    health_status = failure_monitor.get_dag_health_status()
-    
-    return jsonify({
-        "status": "success",
-        "data": health_status,
-        "timestamp": timezone.utcnow().isoformat(),
-    })
+
+    try:
+        dag_summary = dag_monitor.get_dag_status_summary()
+        health_status = failure_monitor.get_dag_health_status()
+        import_errors = dag_monitor.get_dag_import_errors()
+
+        health_score = dag_summary.get("health_score", 100)
+        is_healthy = health_score >= 70 and len(import_errors) == 0
+
+        payload = {
+            "status": "healthy" if is_healthy else "degraded",
+            "health_score": health_score,
+            "summary": dag_summary,
+            "dag_health": health_status.get("summary", {}),
+            "import_error_count": len(import_errors),
+            "timestamp": timezone.utcnow().isoformat(),
+        }
+
+        http_status = 200 if is_healthy else 503
+        return jsonify({"status": "success", "data": payload}), http_status
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "timestamp": timezone.utcnow().isoformat(),
+        }), 503
 
 
 @watcher_api_blueprint.route("/health/<dag_id>", methods=["GET"])
