@@ -1,13 +1,12 @@
 """Tests for Email Notifier."""
 
-import pytest
 from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from airflow_watcher.notifiers.email_notifier import EmailNotifier
+from airflow_watcher.config import WatcherConfig
 from airflow_watcher.models.failure import DAGFailure, TaskFailure
 from airflow_watcher.models.sla import SLAMissEvent
-from airflow_watcher.config import WatcherConfig
+from airflow_watcher.notifiers.email_notifier import EmailNotifier
 
 
 class TestEmailNotifier:
@@ -32,7 +31,7 @@ class TestEmailNotifier:
         """Test building HTML content for failure alert."""
         notifier = EmailNotifier()
         now = datetime.utcnow()
-        
+
         failure = DAGFailure(
             dag_id="test_dag",
             run_id="manual__2024-01-01",
@@ -50,9 +49,9 @@ class TestEmailNotifier:
                 ),
             ],
         )
-        
+
         html = notifier._build_failure_html(failure)
-        
+
         assert "test_dag" in html
         assert "DAG Failure Alert" in html
         assert "task1" in html
@@ -61,7 +60,7 @@ class TestEmailNotifier:
         """Test building HTML content for SLA miss alert."""
         notifier = EmailNotifier()
         now = datetime.utcnow()
-        
+
         sla_miss = SLAMissEvent(
             dag_id="test_dag",
             task_id="test_task",
@@ -69,9 +68,9 @@ class TestEmailNotifier:
             timestamp=now,
             description="Missed deadline",
         )
-        
+
         html = notifier._build_sla_miss_html(sla_miss)
-        
+
         assert "test_dag" in html
         assert "test_task" in html
         assert "SLA Miss Alert" in html
@@ -79,14 +78,14 @@ class TestEmailNotifier:
     def test_send_failure_alert_no_recipients(self):
         """Test failure alert with no recipients."""
         notifier = EmailNotifier()
-        
+
         now = datetime.utcnow()
         failure = DAGFailure(
             dag_id="test_dag",
             run_id="test_run",
             execution_date=now,
         )
-        
+
         result = notifier.send_failure_alert(failure)
         assert result is False
 
@@ -96,14 +95,14 @@ class TestEmailNotifier:
             email_recipients=["test@example.com"],
         )
         notifier = EmailNotifier(config=config)
-        
+
         now = datetime.utcnow()
         failure = DAGFailure(
             dag_id="test_dag",
             run_id="test_run",
             execution_date=now,
         )
-        
+
         result = notifier.send_failure_alert(failure)
         assert result is False
 
@@ -116,23 +115,23 @@ class TestEmailNotifier:
             email_recipients=["test@example.com"],
         )
         notifier = EmailNotifier(config=config)
-        
+
         mock_server = MagicMock()
         mock_smtp.return_value.__enter__.return_value = mock_server
-        
+
         result = notifier._send_email(
             subject="Test Subject",
             html_body="<p>Test body</p>",
             recipients=["test@example.com"],
         )
-        
+
         assert result is True
 
     def test_build_summary_html(self):
         """Test building daily summary HTML."""
         notifier = EmailNotifier()
         now = datetime.utcnow()
-        
+
         failures = [
             DAGFailure(
                 dag_id=f"dag_{i}",
@@ -142,7 +141,7 @@ class TestEmailNotifier:
             )
             for i in range(3)
         ]
-        
+
         sla_misses = [
             SLAMissEvent(
                 dag_id=f"dag_{i}",
@@ -152,9 +151,9 @@ class TestEmailNotifier:
             )
             for i in range(2)
         ]
-        
+
         html = notifier._build_summary_html(failures, sla_misses)
-        
+
         assert "Daily Summary" in html
         assert "dag_0" in html
         assert "DAG Failures (3)" in html

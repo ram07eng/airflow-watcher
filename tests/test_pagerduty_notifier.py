@@ -1,9 +1,7 @@
 """Tests for PagerDuty Notifier."""
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from airflow_watcher.config import WatcherConfig
 from airflow_watcher.models.failure import DAGFailure, TaskFailure

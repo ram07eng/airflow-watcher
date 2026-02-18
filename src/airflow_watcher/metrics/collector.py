@@ -1,9 +1,9 @@
 """Metrics Collector - Gathers metrics from monitors for emission."""
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 from airflow.utils import timezone
 
@@ -80,11 +80,11 @@ class MetricsCollector:
             WatcherMetrics with current values
         """
         from airflow_watcher.monitors.dag_failure_monitor import DAGFailureMonitor
-        from airflow_watcher.monitors.sla_monitor import SLAMonitor
-        from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
-        from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
         from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
         from airflow_watcher.monitors.dependency_monitor import DependencyMonitor
+        from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
+        from airflow_watcher.monitors.sla_monitor import SLAMonitor
+        from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
 
         metrics = WatcherMetrics()
 

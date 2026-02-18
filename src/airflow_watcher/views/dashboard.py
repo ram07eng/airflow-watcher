@@ -1,15 +1,15 @@
 """Dashboard Views for Airflow Watcher."""
 
-from flask import Blueprint, render_template, jsonify, request
+from flask import request
 from flask_appbuilder import BaseView, expose
 
 from airflow_watcher.monitors.dag_failure_monitor import DAGFailureMonitor
-from airflow_watcher.monitors.sla_monitor import SLAMonitor
-from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
-from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
 from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
 from airflow_watcher.monitors.dependency_monitor import DependencyMonitor
-from airflow_watcher.utils.helpers import get_all_dag_tags, get_all_dag_owners, get_dags_by_filter
+from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
+from airflow_watcher.monitors.sla_monitor import SLAMonitor
+from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
+from airflow_watcher.utils.helpers import get_all_dag_owners, get_all_dag_tags, get_dags_by_filter
 
 
 def get_filter_context(request_args):
@@ -17,10 +17,10 @@ def get_filter_context(request_args):
     tag = request_args.get("tag", "").strip() or None
     owner = request_args.get("owner", "").strip() or None
     hours = int(request_args.get("hours", 24))
-    
+
     # Get allowed DAG IDs based on filters
     allowed_dag_ids = get_dags_by_filter(tag=tag, owner=owner)
-    
+
     return {
         "filters": {"tag": tag, "owner": owner, "hours": hours},
         "available_tags": get_all_dag_tags(),
@@ -82,7 +82,7 @@ class WatcherDashboardView(BaseView):
         """View for DAG failures."""
         failure_monitor = DAGFailureMonitor()
         filter_ctx = get_filter_context(request.args)
-        
+
         # Get filter parameters
         dag_id = request.args.get("dag_id")
         hours = filter_ctx["filters"]["hours"]
@@ -93,7 +93,7 @@ class WatcherDashboardView(BaseView):
             limit=100
         )
         stats = failure_monitor.get_failure_statistics(lookback_hours=hours)
-        
+
         # Apply tag/owner filter
         failures = filter_results(failures, filter_ctx["allowed_dag_ids"])
 
@@ -121,7 +121,7 @@ class WatcherDashboardView(BaseView):
             limit=100
         )
         sla_stats = sla_monitor.get_sla_statistics(lookback_hours=hours)
-        
+
         # Apply tag/owner filter
         sla_misses = filter_results(sla_misses, filter_ctx["allowed_dag_ids"])
 
@@ -141,23 +141,23 @@ class WatcherDashboardView(BaseView):
         dag_monitor = DAGHealthMonitor()
         filter_ctx = get_filter_context(request.args)
         allowed = filter_ctx["allowed_dag_ids"]
-        
+
         health_status = failure_monitor.get_dag_health_status()
         scheduling_lag = scheduling_monitor.get_scheduling_lag(lookback_hours=24)
         stale_dags = scheduling_monitor.get_stale_dags(expected_interval_hours=24)
-        
+
         # Apply filters
         if allowed is not None:
             health_status["healthy"] = [d for d in health_status.get("healthy", []) if d.get("dag_id") in allowed]
             health_status["unhealthy"] = [d for d in health_status.get("unhealthy", []) if d.get("dag_id") in allowed]
             health_status["summary"]["healthy_count"] = len(health_status["healthy"])
             health_status["summary"]["unhealthy_count"] = len(health_status["unhealthy"])
-        
+
         delayed_dags = filter_results(scheduling_lag.get("delayed_dags", []), allowed)
         stale_dags = filter_results(stale_dags, allowed)
         import_errors = dag_monitor.get_dag_import_errors()
         inactive_dags = filter_results(dag_monitor.get_inactive_dags(inactive_days=30), allowed)
-        
+
         context = {
             "health_status": health_status,
             "delayed_dags": delayed_dags,
@@ -176,12 +176,12 @@ class WatcherDashboardView(BaseView):
         task_monitor = TaskHealthMonitor()
         filter_ctx = get_filter_context(request.args)
         allowed = filter_ctx["allowed_dag_ids"]
-        
+
         long_running = filter_results(task_monitor.get_long_running_tasks(threshold_minutes=60), allowed)
         retry_tasks = filter_results(task_monitor.get_retry_heavy_tasks(lookback_hours=24), allowed)
         zombies = filter_results(task_monitor.get_zombie_tasks(), allowed)
         failure_patterns = filter_results(task_monitor.get_task_failure_patterns(lookback_hours=168), allowed)
-        
+
         context = {
             "long_running_tasks": long_running,
             "retry_tasks": retry_tasks,
@@ -198,14 +198,14 @@ class WatcherDashboardView(BaseView):
         scheduling_monitor = SchedulingMonitor()
         filter_ctx = get_filter_context(request.args)
         allowed = filter_ctx["allowed_dag_ids"]
-        
+
         scheduling_lag = scheduling_monitor.get_scheduling_lag(lookback_hours=24)
         stale_dags = filter_results(scheduling_monitor.get_stale_dags(expected_interval_hours=24), allowed)
-        
+
         # Filter delayed dags
         if allowed is not None and "delayed_dags" in scheduling_lag:
             scheduling_lag["delayed_dags"] = [d for d in scheduling_lag["delayed_dags"] if d.get("dag_id") in allowed]
-        
+
         context = {
             "scheduling_lag": scheduling_lag,
             "queue_status": scheduling_monitor.get_queued_tasks(),
@@ -223,12 +223,12 @@ class WatcherDashboardView(BaseView):
         dag_monitor = DAGHealthMonitor()
         filter_ctx = get_filter_context(request.args)
         allowed = filter_ctx["allowed_dag_ids"]
-        
+
         inactive_dags = filter_results(dag_monitor.get_inactive_dags(inactive_days=30), allowed)
         complexity = dag_monitor.get_dag_complexity_analysis()
         if allowed is not None:
             complexity = [c for c in complexity if c.get("dag_id") in allowed]
-        
+
         context = {
             "dag_summary": dag_monitor.get_dag_status_summary(),
             "import_errors": dag_monitor.get_dag_import_errors(),
@@ -245,10 +245,10 @@ class WatcherDashboardView(BaseView):
         dep_monitor = DependencyMonitor()
         filter_ctx = get_filter_context(request.args)
         allowed = filter_ctx["allowed_dag_ids"]
-        
+
         upstream_failures = filter_results(dep_monitor.get_upstream_failures(lookback_hours=24), allowed)
         correlations = dep_monitor.get_failure_correlation(lookback_hours=24)
-        
+
         context = {
             "upstream_failures": upstream_failures,
             "cross_dag_deps": dep_monitor.get_cross_dag_dependencies(),

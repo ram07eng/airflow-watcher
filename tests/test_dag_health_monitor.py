@@ -1,8 +1,6 @@
 """Tests for DAGHealthMonitor."""
 
-from unittest.mock import MagicMock
 
-import pytest
 
 from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
 

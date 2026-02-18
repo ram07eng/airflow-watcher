@@ -1,11 +1,8 @@
 """Tests for MetricsCollector and WatcherMetrics."""
 
-from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
-from airflow_watcher.metrics.collector import WatcherMetrics, MetricsCollector
+from airflow_watcher.metrics.collector import MetricsCollector, WatcherMetrics
 
 
 class TestWatcherMetrics:
