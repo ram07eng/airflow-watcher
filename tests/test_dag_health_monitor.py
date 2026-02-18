@@ -1,6 +1,5 @@
 """Tests for DAGHealthMonitor."""
 
-
 from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
 
 

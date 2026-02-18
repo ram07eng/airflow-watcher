@@ -39,7 +39,6 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "ruff>=0.1.0",
-    "black>=23.0.0",
     "mypy>=1.0.0",
 ]
 pagerduty = [
@@ -74,13 +73,13 @@ where = ["src"]
 line-length = 120
 target-version = "py310"
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 ignore = ["E501", "F821"]
-
-[tool.black]
-line-length = 120
-target-version = ["py310"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

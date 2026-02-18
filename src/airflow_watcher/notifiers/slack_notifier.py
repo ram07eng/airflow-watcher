@@ -128,9 +128,7 @@ class SlackNotifier:
                     "text": {
                         "type": "mrkdwn",
                         "text": (
-                            f"*{failure.dag_id}*\n"
-                            f"Run: `{failure.run_id}`\n"
-                            f"Failed Tasks: {len(failure.failed_tasks)}"
+                            f"*{failure.dag_id}*\nRun: `{failure.run_id}`\nFailed Tasks: {len(failure.failed_tasks)}"
                         ),
                     },
                 }
