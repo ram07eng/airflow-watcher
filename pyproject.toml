@@ -26,7 +26,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Framework :: Apache Airflow",
     "Topic :: System :: Monitoring",
-    "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
     "apache-airflow>=2.7.0,<3.0",
