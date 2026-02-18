@@ -1,8 +1,9 @@
 """Tests for DAG Failure Monitor."""
 
-import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from airflow_watcher.monitors.dag_failure_monitor import DAGFailureMonitor
 from airflow_watcher.models.failure import DAGFailure, TaskFailure
@@ -23,21 +24,6 @@ class TestDAGFailureMonitor:
         monitor = DAGFailureMonitor(config=config)
         assert monitor.config.failure_lookback_hours == 48
 
-    @patch("airflow_watcher.monitors.dag_failure_monitor.provide_session")
-    def test_get_recent_failures_empty(self, mock_session):
-        """Test getting failures when none exist."""
-        mock_session_obj = MagicMock()
-        mock_query = MagicMock()
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
-        mock_session_obj.query.return_value = mock_query
-
-        monitor = DAGFailureMonitor()
-        # In real tests, we'd mock the session properly
-        # This is a placeholder for actual implementation
-
     def test_dag_failure_to_dict(self):
         """Test DAGFailure serialization."""
         now = datetime.utcnow()
@@ -57,9 +43,9 @@ class TestDAGFailureMonitor:
                 )
             ],
         )
-        
+
         result = failure.to_dict()
-        
+
         assert result["dag_id"] == "test_dag"
         assert result["state"] == "failed"
         assert result["failed_task_count"] == 1
@@ -76,9 +62,9 @@ class TestDAGFailureMonitor:
             try_number=2,
             max_tries=3,
         )
-        
+
         result = task_failure.to_dict()
-        
+
         assert result["task_id"] == "test_task"
         assert result["try_number"] == 2
         assert result["max_tries"] == 3
@@ -93,7 +79,7 @@ class TestDAGFailureMonitor:
             start_date=now - timedelta(seconds=3600),
             end_date=now,
         )
-        
+
         assert failure.duration == 3600
 
     def test_dag_failure_duration_none(self):
@@ -103,5 +89,38 @@ class TestDAGFailureMonitor:
             run_id="test_run",
             execution_date=datetime.utcnow(),
         )
-        
+
         assert failure.duration is None
+
+    def test_dag_failure_external_trigger_default(self):
+        """Test DAGFailure external_trigger defaults to False."""
+        failure = DAGFailure(
+            dag_id="test_dag",
+            run_id="test_run",
+            execution_date=datetime.utcnow(),
+        )
+        assert failure.external_trigger is False
+
+    def test_dag_failure_no_failed_tasks(self):
+        """Test DAGFailure with no failed tasks."""
+        failure = DAGFailure(
+            dag_id="test_dag",
+            run_id="test_run",
+            execution_date=datetime.utcnow(),
+        )
+        result = failure.to_dict()
+        assert result["failed_task_count"] == 0
+        assert result["failed_tasks"] == []
+
+    def test_monitor_has_required_methods(self):
+        """DAGFailureMonitor exposes the expected public API."""
+        monitor = DAGFailureMonitor()
+        assert callable(getattr(monitor, "get_recent_failures", None))
+        assert callable(getattr(monitor, "get_failure_statistics", None))
+        assert callable(getattr(monitor, "get_dag_health_status", None))
+
+    def test_failure_statistics_config_default(self):
+        """DAGFailureMonitor uses config lookback_hours default of 24."""
+        monitor = DAGFailureMonitor()
+        assert monitor.config.failure_lookback_hours == 24
+
