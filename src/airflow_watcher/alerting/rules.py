@@ -238,18 +238,20 @@ def save_rules_to_file(rules: List[AlertRule], filepath: str):
     """
     rules_data = []
     for rule in rules:
-        rules_data.append({
-            "name": rule.name,
-            "metric": rule.metric,
-            "condition": rule.condition,
-            "threshold": rule.threshold,
-            "severity": rule.severity.value,
-            "channels": [c.value for c in rule.channels],
-            "cooldown_minutes": rule.cooldown_minutes,
-            "dag_filter": rule.dag_filter,
-            "owner_filter": rule.owner_filter,
-            "tag_filter": rule.tag_filter,
-        })
+        rules_data.append(
+            {
+                "name": rule.name,
+                "metric": rule.metric,
+                "condition": rule.condition,
+                "threshold": rule.threshold,
+                "severity": rule.severity.value,
+                "channels": [c.value for c in rule.channels],
+                "cooldown_minutes": rule.cooldown_minutes,
+                "dag_filter": rule.dag_filter,
+                "owner_filter": rule.owner_filter,
+                "tag_filter": rule.tag_filter,
+            }
+        )
 
     try:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)

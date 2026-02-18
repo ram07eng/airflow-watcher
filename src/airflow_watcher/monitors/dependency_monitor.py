@@ -39,20 +39,26 @@ class DependencyMonitor:
         """
         cutoff = timezone.utcnow() - timedelta(hours=lookback_hours)
 
-        query = session.query(TaskInstance).filter(
-            TaskInstance.state == TaskInstanceState.UPSTREAM_FAILED,
-            TaskInstance.end_date >= cutoff,
-        ).order_by(TaskInstance.end_date.desc())
+        query = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.state == TaskInstanceState.UPSTREAM_FAILED,
+                TaskInstance.end_date >= cutoff,
+            )
+            .order_by(TaskInstance.end_date.desc())
+        )
 
         upstream_failures = []
         for ti in query.limit(100).all():
-            upstream_failures.append({
-                "dag_id": ti.dag_id,
-                "task_id": ti.task_id,
-                "run_id": ti.run_id,
-                "execution_date": ti.execution_date.isoformat() if ti.execution_date else None,
-                "timestamp": ti.end_date.isoformat() if ti.end_date else None,
-            })
+            upstream_failures.append(
+                {
+                    "dag_id": ti.dag_id,
+                    "task_id": ti.task_id,
+                    "run_id": ti.run_id,
+                    "execution_date": ti.execution_date.isoformat() if ti.execution_date else None,
+                    "timestamp": ti.end_date.isoformat() if ti.end_date else None,
+                }
+            )
 
         return upstream_failures
 
@@ -138,31 +144,35 @@ class DependencyMonitor:
                 # Check for ExternalTaskSensor
                 if task.task_type == "ExternalTaskSensor":
                     try:
-                        external_dag_id = getattr(task, 'external_dag_id', None)
-                        external_task_id = getattr(task, 'external_task_id', None)
+                        external_dag_id = getattr(task, "external_dag_id", None)
+                        external_task_id = getattr(task, "external_task_id", None)
 
                         if external_dag_id:
-                            dependencies.append({
-                                "dag_id": dag_id,
-                                "task_id": task.task_id,
-                                "depends_on_dag": external_dag_id,
-                                "depends_on_task": external_task_id,
-                                "dependency_type": "ExternalTaskSensor",
-                            })
+                            dependencies.append(
+                                {
+                                    "dag_id": dag_id,
+                                    "task_id": task.task_id,
+                                    "depends_on_dag": external_dag_id,
+                                    "depends_on_task": external_task_id,
+                                    "dependency_type": "ExternalTaskSensor",
+                                }
+                            )
                     except Exception:
                         pass
 
                 # Check for TriggerDagRunOperator
                 if task.task_type in ("TriggerDagRunOperator", "TriggerDagRun"):
                     try:
-                        trigger_dag_id = getattr(task, 'trigger_dag_id', None)
+                        trigger_dag_id = getattr(task, "trigger_dag_id", None)
                         if trigger_dag_id:
-                            dependencies.append({
-                                "dag_id": dag_id,
-                                "task_id": task.task_id,
-                                "triggers_dag": trigger_dag_id,
-                                "dependency_type": "TriggerDagRunOperator",
-                            })
+                            dependencies.append(
+                                {
+                                    "dag_id": dag_id,
+                                    "task_id": task.task_id,
+                                    "triggers_dag": trigger_dag_id,
+                                    "dependency_type": "TriggerDagRunOperator",
+                                }
+                            )
                     except Exception:
                         pass
 
@@ -186,10 +196,14 @@ class DependencyMonitor:
             Dictionary with dependency chain status
         """
         # Get all task instances for this run
-        task_instances = session.query(TaskInstance).filter(
-            TaskInstance.dag_id == dag_id,
-            TaskInstance.execution_date == execution_date,
-        ).all()
+        task_instances = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.dag_id == dag_id,
+                TaskInstance.execution_date == execution_date,
+            )
+            .all()
+        )
 
         if not task_instances:
             return {"error": "No task instances found"}
@@ -244,10 +258,15 @@ class DependencyMonitor:
         cutoff = timezone.utcnow() - timedelta(hours=lookback_hours)
 
         # Get failed DAG runs with timestamps
-        failed_runs = session.query(DagRun).filter(
-            DagRun.state == DagRunState.FAILED,
-            DagRun.end_date >= cutoff,
-        ).order_by(DagRun.end_date).all()
+        failed_runs = (
+            session.query(DagRun)
+            .filter(
+                DagRun.state == DagRunState.FAILED,
+                DagRun.end_date >= cutoff,
+            )
+            .order_by(DagRun.end_date)
+            .all()
+        )
 
         if len(failed_runs) < 2:
             return {
@@ -261,7 +280,7 @@ class DependencyMonitor:
         window_minutes = 10
 
         for i, run1 in enumerate(failed_runs):
-            for run2 in failed_runs[i+1:]:
+            for run2 in failed_runs[i + 1 :]:
                 if run1.dag_id != run2.dag_id:
                     time_diff = abs((run1.end_date - run2.end_date).total_seconds() / 60)
 
@@ -271,19 +290,20 @@ class DependencyMonitor:
 
                         # Check if we already have this pair
                         existing = next(
-                            (c for c in correlations if tuple(sorted([c["dag_1"], c["dag_2"]])) == pair),
-                            None
+                            (c for c in correlations if tuple(sorted([c["dag_1"], c["dag_2"]])) == pair), None
                         )
 
                         if existing:
                             existing["co_failure_count"] += 1
                         else:
-                            correlations.append({
-                                "dag_1": run1.dag_id,
-                                "dag_2": run2.dag_id,
-                                "co_failure_count": 1,
-                                "last_co_failure": max(run1.end_date, run2.end_date).isoformat(),
-                            })
+                            correlations.append(
+                                {
+                                    "dag_1": run1.dag_id,
+                                    "dag_2": run2.dag_id,
+                                    "co_failure_count": 1,
+                                    "last_co_failure": max(run1.end_date, run2.end_date).isoformat(),
+                                }
+                            )
 
         return {
             "period_hours": lookback_hours,

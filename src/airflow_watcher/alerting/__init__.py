@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class AlertSeverity(Enum):
     """Alert severity levels."""
+
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
@@ -27,6 +28,7 @@ class AlertSeverity(Enum):
 
 class AlertChannel(Enum):
     """Available alert channels."""
+
     SLACK = "slack"
     EMAIL = "email"
     PAGERDUTY = "pagerduty"
@@ -162,6 +164,7 @@ class AlertManager:
         if self.config.slack_webhook_url or self.config.slack_token:
             try:
                 from airflow_watcher.notifiers.slack_notifier import SlackNotifier
+
                 self._notifiers[AlertChannel.SLACK] = SlackNotifier(self.config)
             except Exception as e:
                 logger.warning(f"Failed to initialize Slack notifier: {e}")
@@ -170,6 +173,7 @@ class AlertManager:
         if self.config.smtp_host:
             try:
                 from airflow_watcher.notifiers.email_notifier import EmailNotifier
+
                 self._notifiers[AlertChannel.EMAIL] = EmailNotifier(self.config)
             except Exception as e:
                 logger.warning(f"Failed to initialize Email notifier: {e}")
@@ -178,6 +182,7 @@ class AlertManager:
         if self.config.pagerduty_routing_key:
             try:
                 from airflow_watcher.notifiers.pagerduty_notifier import PagerDutyNotifier
+
                 self._notifiers[AlertChannel.PAGERDUTY] = PagerDutyNotifier(self.config)
             except Exception as e:
                 logger.warning(f"Failed to initialize PagerDuty notifier: {e}")
@@ -398,10 +403,12 @@ class AlertManager:
 
         for alert in alerts:
             send_results = self.send_alert(alert)
-            results.append({
-                "alert": alert,
-                "channels": send_results,
-            })
+            results.append(
+                {
+                    "alert": alert,
+                    "channels": send_results,
+                }
+            )
 
         return results
 

@@ -87,11 +87,7 @@ class WatcherDashboardView(BaseView):
         dag_id = request.args.get("dag_id")
         hours = filter_ctx["filters"]["hours"]
 
-        failures = failure_monitor.get_recent_failures(
-            dag_id=dag_id,
-            lookback_hours=hours,
-            limit=100
-        )
+        failures = failure_monitor.get_recent_failures(dag_id=dag_id, lookback_hours=hours, limit=100)
         stats = failure_monitor.get_failure_statistics(lookback_hours=hours)
 
         # Apply tag/owner filter
@@ -115,11 +111,7 @@ class WatcherDashboardView(BaseView):
         dag_id = request.args.get("dag_id")
         hours = filter_ctx["filters"]["hours"]
 
-        sla_misses = sla_monitor.get_recent_sla_misses(
-            dag_id=dag_id,
-            lookback_hours=hours,
-            limit=100
-        )
+        sla_misses = sla_monitor.get_recent_sla_misses(dag_id=dag_id, lookback_hours=hours, limit=100)
         sla_stats = sla_monitor.get_sla_statistics(lookback_hours=hours)
 
         # Apply tag/owner filter
