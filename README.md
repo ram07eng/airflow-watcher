@@ -61,6 +61,49 @@ Navigate to **Watcher** in the Airflow UI navigation to access:
 - **Task Health** - Long-running and zombie tasks
 - **Dependencies** - Cross-DAG dependency tracking
 
+## Architecture
+
+```
++-------------------------------------------------------------+
+|                   Airflow Webserver                          |
+|                                                             |
+|  +-------------------------------------------------------+  |
+|  |              Airflow Watcher Plugin                    |  |
+|  |                                                       |  |
+|  |  +-------------+    +------------------------------+  |  |
+|  |  | Flask Views  |    |        Monitors (6)          |  |  |
+|  |  | (Dashboard)  |<---|  - DAG Failure Monitor       |  |  |
+|  |  |              |    |  - SLA Monitor               |  |  |
+|  |  | REST API     |    |  - Task Health Monitor       |  |  |
+|  |  | /api/watcher |    |  - Scheduling Monitor        |  |  |
+|  |  +-------------+    |  - Dependency Monitor        |  |  |
+|  |         |           |  - DAG Health Monitor        |  |  |
+|  |         |           +----------+-------------------+  |  |
+|  |         |                      |                      |  |
+|  |         |           +----------v-------------------+  |  |
+|  |         |           |    Metrics Collector          |  |  |
+|  |         |           |    (WatcherMetrics)           |  |  |
+|  |         |           +----------+-------------------+  |  |
+|  |         |                      |                      |  |
+|  |         v                      v                      |  |
+|  |  +-------------+    +------------------------------+  |  |
+|  |  |  Notifiers   |    |        Emitters              |  |  |
+|  |  |  - Slack     |    |  - StatsD / Datadog (UDP)    |  |  |
+|  |  |  - Email     |    |  - Prometheus (/metrics)     |  |  |
+|  |  |  - PagerDuty |    |                              |  |  |
+|  |  +-------------+    +------------------------------+  |  |
+|  +-------------------------------------------------------+  |
+|                          |                                  |
+|                          v                                  |
+|              +-----------------------+                      |
+|              |  Airflow Metadata DB  |                      |
+|              |  (PostgreSQL/MySQL)   |                      |
+|              +-----------------------+                      |
++-------------------------------------------------------------+
+```
+
+Everything runs inside the Airflow webserver process. No separate workers, no message queues, no external databases. The plugin reads from the same metadata DB that Airflow already maintains.
+
 ## Project Structure
 
 ```
