@@ -1,0 +1,221 @@
+{% extends "airflow/main.html" %}
+
+{% block title %}Task Health{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+    .watcher-page { padding: 20px; }
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-card.critical { border-top: 4px solid #d32f2f; }
+    .stat-card.warning { border-top: 4px solid #ff9800; }
+    .stat-card.info { border-top: 4px solid #2196f3; }
+    .stat-value { font-size: 2.2em; font-weight: bold; }
+    .stat-label { color: #666; font-size: 0.9em; margin-top: 5px; }
+    .section { 
+        background: white; 
+        border-radius: 8px; 
+        padding: 20px; 
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .section h2 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .task-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .task-table th, .task-table td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+    .task-table th { background: #f5f5f5; font-weight: 600; }
+    .task-table tr:hover { background: #fafafa; }
+    .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: 500;
+    }
+    .badge-critical { background: #ffebee; color: #c62828; }
+    .badge-high { background: #fff3e0; color: #e65100; }
+    .badge-medium { background: #fff8e1; color: #f57f17; }
+    .badge-low { background: #e8f5e9; color: #2e7d32; }
+    .badge-danger { background: #ffebee; color: #d32f2f; }
+    .badge-warning { background: #fff3e0; color: #e65100; }
+    .dag-link { color: #1976d2; text-decoration: none; }
+    .dag-link:hover { text-decoration: underline; }
+    .empty-state { text-align: center; padding: 40px; color: #666; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="watcher-page">
+    <h1>🔧 Task Health Monitor</h1>
+    
+    <!-- Filter Bar -->
+    {% include "watcher/components/filter_bar.html" %}
+    
+    <div class="stats-row">
+        <div class="stat-card critical">
+            <div class="stat-value">{{ long_running_tasks|length }}</div>
+            <div class="stat-label">Long-Running Tasks</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-value">{{ retry_tasks|length }}</div>
+            <div class="stat-label">Retry-Heavy Tasks</div>
+        </div>
+        <div class="stat-card critical">
+            <div class="stat-value">{{ zombies|length }}</div>
+            <div class="stat-label">Zombie Tasks</div>
+        </div>
+        <div class="stat-card info">
+            <div class="stat-value">{{ failure_patterns.flaky_tasks|length }}</div>
+            <div class="stat-label">Flaky Tasks</div>
+        </div>
+    </div>
+
+    <!-- Long Running Tasks -->
+    <div class="section">
+        <h2>⏱️ Long-Running Tasks (> 60 min)</h2>
+        {% if long_running_tasks %}
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th>DAG</th>
+                    <th>Task</th>
+                    <th>Running Time</th>
+                    <th>Operator</th>
+                    <th>Severity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in long_running_tasks[:15] %}
+                <tr>
+                    <td><a href="{{ url_for('Airflow.graph', dag_id=task.dag_id) }}" class="dag-link">{{ task.dag_id }}</a></td>
+                    <td><code>{{ task.task_id }}</code></td>
+                    <td>{{ "%.1f"|format(task.running_minutes) }} min</td>
+                    <td>{{ task.operator or 'N/A' }}</td>
+                    <td><span class="badge badge-{{ task.severity }}">{{ task.severity }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">✅ No long-running tasks detected</div>
+        {% endif %}
+    </div>
+
+    <!-- Zombie Tasks -->
+    <div class="section">
+        <h2>🧟 Potential Zombie Tasks</h2>
+        {% if zombies %}
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th>DAG</th>
+                    <th>Task</th>
+                    <th>Running Time</th>
+                    <th>DAG Run State</th>
+                    <th>Orphaned</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in zombies[:15] %}
+                <tr>
+                    <td><a href="{{ url_for('Airflow.graph', dag_id=task.dag_id) }}" class="dag-link">{{ task.dag_id }}</a></td>
+                    <td><code>{{ task.task_id }}</code></td>
+                    <td>{{ "%.1f"|format(task.running_minutes) }} min</td>
+                    <td>{{ task.dag_run_state }}</td>
+                    <td>
+                        {% if task.is_orphaned %}
+                        <span class="badge badge-danger">Yes</span>
+                        {% else %}
+                        <span class="badge badge-low">No</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">✅ No zombie tasks detected</div>
+        {% endif %}
+    </div>
+
+    <!-- Retry Heavy Tasks -->
+    <div class="section">
+        <h2>🔄 Tasks with Excessive Retries</h2>
+        {% if retry_tasks %}
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th>DAG</th>
+                    <th>Task</th>
+                    <th>Attempts</th>
+                    <th>State</th>
+                    <th>Operator</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in retry_tasks[:15] %}
+                <tr>
+                    <td><a href="{{ url_for('Airflow.graph', dag_id=task.dag_id) }}" class="dag-link">{{ task.dag_id }}</a></td>
+                    <td><code>{{ task.task_id }}</code></td>
+                    <td><span class="badge badge-warning">{{ task.try_number }} / {{ task.max_tries }}</span></td>
+                    <td>{{ task.state }}</td>
+                    <td>{{ task.operator or 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">✅ No retry-heavy tasks in the last 24 hours</div>
+        {% endif %}
+    </div>
+
+    <!-- Flaky Tasks -->
+    <div class="section">
+        <h2>🎲 Flaky Tasks (High failure + retry success)</h2>
+        {% if failure_patterns.flaky_tasks %}
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th>DAG</th>
+                    <th>Task</th>
+                    <th>Failure Count</th>
+                    <th>Retry Successes</th>
+                    <th>Flakiness Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in failure_patterns.flaky_tasks %}
+                <tr>
+                    <td><a href="{{ url_for('Airflow.graph', dag_id=task.dag_id) }}" class="dag-link">{{ task.dag_id }}</a></td>
+                    <td><code>{{ task.task_id }}</code></td>
+                    <td>{{ task.failure_count }}</td>
+                    <td>{{ task.retry_success_count }}</td>
+                    <td><span class="badge badge-warning">{{ task.flakiness_score }}%</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">✅ No flaky tasks detected in the last 7 days</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
