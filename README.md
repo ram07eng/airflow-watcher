@@ -141,7 +141,7 @@ See [demo/README.md](demo/README.md) for more details.
 
 ### Setup
 
-1. Add to your MWAA `requirements.txt` in S3:
+1. Add `airflow-watcher` to your MWAA `requirements.txt`:
 
 ```
 airflow-watcher==0.1.2
@@ -152,9 +152,26 @@ For Prometheus metrics support:
 airflow-watcher[all]==0.1.2
 ```
 
-2. Update your MWAA environment to pick up the new requirements.
+2. Upload `requirements.txt` to your MWAA S3 bucket:
 
-3. Once the environment restarts, verify at:
+```bash
+aws s3 cp requirements.txt s3://<your-mwaa-bucket>/requirements.txt
+```
+
+3. Update your MWAA environment to pick up the new requirements (via AWS Console or CLI):
+
+```bash
+aws mwaa update-environment \
+  --name <your-environment-name> \
+  --requirements-s3-path requirements.txt \
+  --requirements-s3-object-version <version-id>
+```
+
+> **Note:** No `plugins.zip` is needed. Airflow auto-discovers airflow-watcher via the `airflow.plugins` entry point when installed via pip (Airflow 2.7+).
+
+4. Wait for the environment to finish updating (takes a few minutes).
+
+5. Verify at:
 ```
 https://<your-mwaa-url>/api/watcher/health
 ```
