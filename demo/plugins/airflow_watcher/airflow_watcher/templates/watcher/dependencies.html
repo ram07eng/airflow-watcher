@@ -1,0 +1,195 @@
+{% extends "airflow/main.html" %}
+
+{% block title %}Dependency Monitor{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+    .watcher-page { padding: 20px; }
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-card.danger { border-top: 4px solid #d32f2f; }
+    .stat-card.warning { border-top: 4px solid #ff9800; }
+    .stat-card.info { border-top: 4px solid #2196f3; }
+    .stat-value { font-size: 2.2em; font-weight: bold; }
+    .stat-label { color: #666; font-size: 0.9em; margin-top: 5px; }
+    .section { 
+        background: white; 
+        border-radius: 8px; 
+        padding: 20px; 
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .section h2 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .data-table th, .data-table td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+    .data-table th { background: #f5f5f5; font-weight: 600; }
+    .data-table tr:hover { background: #fafafa; }
+    .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: 500;
+    }
+    .badge-danger { background: #ffebee; color: #d32f2f; }
+    .badge-warning { background: #fff3e0; color: #e65100; }
+    .badge-success { background: #e8f5e9; color: #2e7d32; }
+    .badge-info { background: #e3f2fd; color: #1565c0; }
+    .dag-link { color: #1976d2; text-decoration: none; }
+    .dag-link:hover { text-decoration: underline; }
+    .empty-state { text-align: center; padding: 40px; color: #666; }
+    .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .grid-2col { grid-template-columns: 1fr; } }
+    .correlation-card {
+        background: #fff8e1;
+        border-left: 4px solid #ff9800;
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+    }
+    .correlation-card .dags { font-weight: 600; color: #333; }
+    .correlation-card .count { color: #e65100; }
+    .dep-arrow { color: #666; margin: 0 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="watcher-page">
+    <h1>🔗 Dependency Monitor</h1>
+    
+    <!-- Filter Bar -->
+    {% include "watcher/components/filter_bar.html" %}
+    
+    <div class="stats-row">
+        <div class="stat-card danger">
+            <div class="stat-value">{{ upstream_failures|length }}</div>
+            <div class="stat-label">Upstream Failures (24h)</div>
+        </div>
+        <div class="stat-card info">
+            <div class="stat-value">{{ cross_dag_deps|length }}</div>
+            <div class="stat-label">Cross-DAG Dependencies</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-value">{{ correlations.correlations|length if correlations.correlations else 0 }}</div>
+            <div class="stat-label">Failure Correlations</div>
+        </div>
+    </div>
+
+    <!-- Upstream Failures -->
+    <div class="section">
+        <h2>⬆️ Upstream Failed Tasks</h2>
+        <p class="text-muted">Tasks blocked due to upstream task failures</p>
+        {% if upstream_failures %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>DAG</th>
+                    <th>Task</th>
+                    <th>Execution Date</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in upstream_failures[:20] %}
+                <tr>
+                    <td><a href="{{ url_for('Airflow.graph', dag_id=task.dag_id) }}" class="dag-link">{{ task.dag_id }}</a></td>
+                    <td><code>{{ task.task_id }}</code></td>
+                    <td>{{ task.execution_date }}</td>
+                    <td>{{ task.timestamp }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if upstream_failures|length > 20 %}
+        <p><em>...and {{ upstream_failures|length - 20 }} more</em></p>
+        {% endif %}
+        {% else %}
+        <div class="empty-state">✅ No upstream failures detected</div>
+        {% endif %}
+    </div>
+
+    <div class="grid-2col">
+        <!-- Cross-DAG Dependencies -->
+        <div class="section">
+            <h2>🔄 Cross-DAG Dependencies</h2>
+            {% if cross_dag_deps %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>From</th>
+                        <th>Type</th>
+                        <th>To</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dep in cross_dag_deps[:15] %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('Airflow.graph', dag_id=dep.dag_id) }}" class="dag-link">{{ dep.dag_id }}</a>
+                            <br><small><code>{{ dep.task_id }}</code></small>
+                        </td>
+                        <td><span class="badge badge-info">{{ dep.dependency_type }}</span></td>
+                        <td>
+                            {% if dep.depends_on_dag %}
+                            <a href="{{ url_for('Airflow.graph', dag_id=dep.depends_on_dag) }}" class="dag-link">{{ dep.depends_on_dag }}</a>
+                            {% if dep.depends_on_task %}
+                            <br><small><code>{{ dep.depends_on_task }}</code></small>
+                            {% endif %}
+                            {% elif dep.triggers_dag %}
+                            <span class="dep-arrow">→</span>
+                            <a href="{{ url_for('Airflow.graph', dag_id=dep.triggers_dag) }}" class="dag-link">{{ dep.triggers_dag }}</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">No cross-DAG dependencies found</div>
+            {% endif %}
+        </div>
+
+        <!-- Failure Correlations -->
+        <div class="section">
+            <h2>📈 Failure Correlations</h2>
+            <p class="text-muted">DAGs that often fail together (within 10 min)</p>
+            {% if correlations.correlations %}
+            {% for corr in correlations.correlations[:10] %}
+            <div class="correlation-card">
+                <div class="dags">
+                    <a href="{{ url_for('Airflow.graph', dag_id=corr.dag_1) }}" class="dag-link">{{ corr.dag_1 }}</a>
+                    <span class="dep-arrow">↔</span>
+                    <a href="{{ url_for('Airflow.graph', dag_id=corr.dag_2) }}" class="dag-link">{{ corr.dag_2 }}</a>
+                </div>
+                <div class="count">
+                    Failed together <strong>{{ corr.co_failure_count }}</strong> times
+                    <br><small>Last: {{ corr.last_co_failure }}</small>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">No failure correlations detected</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
