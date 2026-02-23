@@ -4,7 +4,7 @@ An Airflow UI plugin for monitoring DAG failures and SLA misses/delays.
 
 ## Demo
 
-![Airflow Watcher Demo](docs/demo.gif)
+![Airflow Watcher Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/demo.gif)
 
 ## Features
 
