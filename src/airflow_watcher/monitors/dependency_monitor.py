@@ -1,6 +1,7 @@
 """Dependency Monitor - Tracks upstream/downstream failures and cascading issues."""
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 
@@ -11,8 +12,13 @@ from airflow.utils.state import DagRunState, TaskInstanceState
 from sqlalchemy.orm import Session
 
 from airflow_watcher.config import WatcherConfig
+from airflow_watcher.utils.cache import MetricsCache
 
 logger = logging.getLogger(__name__)
+
+UPSTREAM_FAILURES_TTL = 60
+CROSS_DAG_TTL = 300  # 5 min — expensive
+CORRELATION_TTL = 120
 
 
 class DependencyMonitor:
@@ -21,6 +27,7 @@ class DependencyMonitor:
     def __init__(self, config: Optional[WatcherConfig] = None):
         """Initialize the dependency monitor."""
         self.config = config or WatcherConfig()
+        self._cache = MetricsCache.get_instance()
 
     @provide_session
     def get_upstream_failures(
@@ -28,15 +35,7 @@ class DependencyMonitor:
         lookback_hours: int = 24,
         session: Session = None,
     ) -> List[Dict]:
-        """Find tasks in upstream_failed state.
-
-        Args:
-            lookback_hours: Hours to look back
-            session: SQLAlchemy session
-
-        Returns:
-            List of upstream failed tasks
-        """
+        """Find tasks in upstream_failed state."""
         cutoff = timezone.utcnow() - timedelta(hours=lookback_hours)
 
         query = (
@@ -69,16 +68,7 @@ class DependencyMonitor:
         task_id: str,
         session: Session = None,
     ) -> Dict:
-        """Analyze the downstream impact of a task failure.
-
-        Args:
-            dag_id: DAG ID
-            task_id: Failed task ID
-            session: SQLAlchemy session
-
-        Returns:
-            Dictionary with impact analysis
-        """
+        """Analyze the downstream impact of a task failure."""
         from airflow.models import DagBag
 
         try:
@@ -95,7 +85,6 @@ class DependencyMonitor:
         if not task:
             return {"error": f"Task {task_id} not found in DAG {dag_id}"}
 
-        # Get all downstream tasks recursively
         affected_tasks = self._get_all_downstream(task, set())
 
         return {
@@ -121,14 +110,71 @@ class DependencyMonitor:
 
     @provide_session
     def get_cross_dag_dependencies(self, session: Session = None) -> List[Dict]:
-        """Identify cross-DAG dependencies using ExternalTaskSensor.
+        """Identify cross-DAG dependencies using serialized DAG data.
 
-        Args:
-            session: SQLAlchemy session
-
-        Returns:
-            List of cross-DAG dependencies
+        Uses SerializedDagModel instead of DagBag to avoid loading all DAGs
+        into memory. At 4500+ DAGs, DagBag takes 30+ seconds.
         """
+
+        def _compute():
+            return self._compute_cross_dag_deps(session)
+
+        return self._cache.get_or_compute("cross_dag_deps", _compute, ttl=CROSS_DAG_TTL)
+
+    def _compute_cross_dag_deps(self, session: Session) -> List[Dict]:
+        """Query serialized DAGs for ExternalTaskSensor/TriggerDagRunOperator."""
+        try:
+            from airflow.models.serialized_dag import SerializedDagModel
+
+            serialized_dags = session.query(SerializedDagModel.dag_id, SerializedDagModel.data).all()
+        except Exception as e:
+            logger.warning(f"SerializedDagModel query failed, falling back to DagBag: {e}")
+            return self._compute_cross_dag_deps_dagbag()
+
+        dependencies: List[Dict] = []
+
+        for dag_id, data in serialized_dags:
+            try:
+                dag_dict = data if isinstance(data, dict) else {}
+                dag_data = dag_dict.get("dag", dag_dict)
+                tasks = dag_data.get("tasks", [])
+
+                for task in tasks:
+                    task_type = task.get("task_type", "")
+                    task_id = task.get("task_id", "")
+
+                    if task_type == "ExternalTaskSensor":
+                        ext_dag = task.get("external_dag_id")
+                        ext_task = task.get("external_task_id")
+                        if ext_dag:
+                            dependencies.append(
+                                {
+                                    "dag_id": dag_id,
+                                    "task_id": task_id,
+                                    "depends_on_dag": ext_dag,
+                                    "depends_on_task": ext_task,
+                                    "dependency_type": "ExternalTaskSensor",
+                                }
+                            )
+
+                    if task_type in ("TriggerDagRunOperator", "TriggerDagRun"):
+                        trigger_dag = task.get("trigger_dag_id")
+                        if trigger_dag:
+                            dependencies.append(
+                                {
+                                    "dag_id": dag_id,
+                                    "task_id": task_id,
+                                    "triggers_dag": trigger_dag,
+                                    "dependency_type": "TriggerDagRunOperator",
+                                }
+                            )
+            except Exception:
+                continue
+
+        return dependencies
+
+    def _compute_cross_dag_deps_dagbag(self) -> List[Dict]:
+        """Fallback: use DagBag for cross-DAG dependency detection."""
         from airflow.models import DagBag
 
         try:
@@ -137,16 +183,14 @@ class DependencyMonitor:
             logger.error(f"Failed to load DagBag: {e}")
             return []
 
-        dependencies = []
+        dependencies: List[Dict] = []
 
         for dag_id, dag in dagbag.dags.items():
             for task in dag.tasks:
-                # Check for ExternalTaskSensor
                 if task.task_type == "ExternalTaskSensor":
                     try:
                         external_dag_id = getattr(task, "external_dag_id", None)
                         external_task_id = getattr(task, "external_task_id", None)
-
                         if external_dag_id:
                             dependencies.append(
                                 {
@@ -160,7 +204,6 @@ class DependencyMonitor:
                     except Exception:
                         pass
 
-                # Check for TriggerDagRunOperator
                 if task.task_type in ("TriggerDagRunOperator", "TriggerDagRun"):
                     try:
                         trigger_dag_id = getattr(task, "trigger_dag_id", None)
@@ -185,17 +228,7 @@ class DependencyMonitor:
         execution_date: datetime,
         session: Session = None,
     ) -> Dict:
-        """Get status of all tasks in a DAG run's dependency chain.
-
-        Args:
-            dag_id: DAG ID
-            execution_date: Execution date to check
-            session: SQLAlchemy session
-
-        Returns:
-            Dictionary with dependency chain status
-        """
-        # Get all task instances for this run
+        """Get status of all tasks in a DAG run's dependency chain."""
         task_instances = (
             session.query(TaskInstance)
             .filter(
@@ -208,9 +241,8 @@ class DependencyMonitor:
         if not task_instances:
             return {"error": "No task instances found"}
 
-        # Group by state
-        state_counts = {}
-        tasks_by_state = {}
+        state_counts: Dict[str, int] = {}
+        tasks_by_state: Dict[str, List[str]] = {}
 
         for ti in task_instances:
             state = str(ti.state)
@@ -220,12 +252,9 @@ class DependencyMonitor:
                 tasks_by_state[state] = []
             tasks_by_state[state].append(ti.task_id)
 
-        # Identify bottlenecks (running tasks with queued downstream)
         bottlenecks = []
         for ti in task_instances:
             if ti.state == TaskInstanceState.RUNNING:
-                # Check if this is blocking others
-                # This is simplified - real implementation would check actual dependencies
                 if state_counts.get(str(TaskInstanceState.SCHEDULED), 0) > 0:
                     bottlenecks.append(ti.task_id)
 
@@ -246,25 +275,31 @@ class DependencyMonitor:
         lookback_hours: int = 24,
         session: Session = None,
     ) -> Dict:
-        """Find DAGs that often fail together (potential shared dependencies).
+        """Find DAGs that often fail together.
 
-        Args:
-            lookback_hours: Hours to analyze
-            session: SQLAlchemy session
-
-        Returns:
-            Dictionary with failure correlations
+        Optimized: uses bucket-based grouping instead of O(n^2) nested loop.
+        At 200 failures, the old code did 40,000 comparisons.
         """
-        cutoff = timezone.utcnow() - timedelta(hours=lookback_hours)
 
-        # Get failed DAG runs with timestamps
+        def _compute():
+            return self._compute_failure_correlation(lookback_hours, session)
+
+        return self._cache.get_or_compute(f"failure_correlation_{lookback_hours}", _compute, ttl=CORRELATION_TTL)
+
+    def _compute_failure_correlation(self, lookback_hours: int, session: Session) -> Dict:
+        """Bucket-based O(n) correlation instead of O(n^2)."""
+        cutoff = timezone.utcnow() - timedelta(hours=lookback_hours)
+        window_minutes = 10
+
+        # Limit to 500 most recent failures to bound computation
         failed_runs = (
-            session.query(DagRun)
+            session.query(DagRun.dag_id, DagRun.end_date)
             .filter(
                 DagRun.state == DagRunState.FAILED,
                 DagRun.end_date >= cutoff,
             )
             .order_by(DagRun.end_date)
+            .limit(500)
             .all()
         )
 
@@ -275,39 +310,41 @@ class DependencyMonitor:
                 "message": "Not enough failures to analyze correlations",
             }
 
-        # Find failures that happened within 10 minutes of each other
-        correlations = []
-        window_minutes = 10
+        # Bucket failures into time windows (O(n) instead of O(n^2))
+        pair_counts: Dict[tuple, Dict] = {}
 
-        for i, run1 in enumerate(failed_runs):
-            for run2 in failed_runs[i + 1 :]:
-                if run1.dag_id != run2.dag_id:
-                    time_diff = abs((run1.end_date - run2.end_date).total_seconds() / 60)
+        # Group runs into buckets by time window
+        buckets: Dict[int, List[str]] = defaultdict(list)
+        for dag_id, end_date in failed_runs:
+            bucket_key = int(end_date.timestamp() // (window_minutes * 60))
+            buckets[bucket_key].append(dag_id)
 
-                    if time_diff <= window_minutes:
-                        # Found potential correlation
-                        pair = tuple(sorted([run1.dag_id, run2.dag_id]))
+        # Check adjacent buckets for co-failures
+        sorted_keys = sorted(buckets.keys())
+        for idx, key in enumerate(sorted_keys):
+            # Combine current bucket with next bucket (handles boundary cases)
+            combined_dags = list(buckets[key])
+            if idx + 1 < len(sorted_keys) and sorted_keys[idx + 1] == key + 1:
+                combined_dags.extend(buckets[sorted_keys[idx + 1]])
 
-                        # Check if we already have this pair
-                        existing = next(
-                            (c for c in correlations if tuple(sorted([c["dag_1"], c["dag_2"]])) == pair), None
-                        )
+            # Find unique DAG pairs in this window
+            unique_dags = list(set(combined_dags))
+            for i in range(len(unique_dags)):
+                for j in range(i + 1, len(unique_dags)):
+                    pair = tuple(sorted([unique_dags[i], unique_dags[j]]))
+                    if pair not in pair_counts:
+                        pair_counts[pair] = {
+                            "dag_1": pair[0],
+                            "dag_2": pair[1],
+                            "co_failure_count": 0,
+                        }
+                    pair_counts[pair]["co_failure_count"] += 1
 
-                        if existing:
-                            existing["co_failure_count"] += 1
-                        else:
-                            correlations.append(
-                                {
-                                    "dag_1": run1.dag_id,
-                                    "dag_2": run2.dag_id,
-                                    "co_failure_count": 1,
-                                    "last_co_failure": max(run1.end_date, run2.end_date).isoformat(),
-                                }
-                            )
+        correlations: List[Dict] = sorted(pair_counts.values(), key=lambda x: x["co_failure_count"], reverse=True)[:20]
 
         return {
             "period_hours": lookback_hours,
             "window_minutes": window_minutes,
-            "correlations": sorted(correlations, key=lambda x: x["co_failure_count"], reverse=True)[:20],
+            "correlations": correlations,
             "timestamp": timezone.utcnow().isoformat(),
         }
