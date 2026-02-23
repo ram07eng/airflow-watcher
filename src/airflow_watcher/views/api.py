@@ -9,6 +9,7 @@ from airflow_watcher.monitors.dependency_monitor import DependencyMonitor
 from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
 from airflow_watcher.monitors.sla_monitor import SLAMonitor
 from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
+from airflow_watcher.utils.cache import MetricsCache
 
 watcher_api_blueprint = Blueprint("watcher_api", __name__, url_prefix="/api/watcher")
 
@@ -498,25 +499,32 @@ def get_task_failure_impact(dag_id: str, task_id: str):
 
 @watcher_api_blueprint.route("/overview", methods=["GET"])
 def get_full_overview():
-    """Get comprehensive monitoring overview."""
+    """Get comprehensive monitoring overview with caching."""
+    cache = MetricsCache.get_instance()
+    cached = cache.get("api_overview")
+    if cached is not None:
+        return jsonify({"status": "success", "data": cached, "timestamp": timezone.utcnow().isoformat()})
+
     failure_monitor = DAGFailureMonitor()
     sla_monitor = SLAMonitor()
     task_monitor = TaskHealthMonitor()
     scheduling_monitor = SchedulingMonitor()
     dag_monitor = DAGHealthMonitor()
 
+    data = {
+        "failure_stats": failure_monitor.get_failure_statistics(lookback_hours=24),
+        "sla_stats": sla_monitor.get_sla_statistics(lookback_hours=24),
+        "long_running_tasks": len(task_monitor.get_long_running_tasks(threshold_minutes=60)),
+        "zombie_count": len(task_monitor.get_zombie_tasks()),
+        "queue_status": scheduling_monitor.get_queued_tasks(),
+        "dag_summary": dag_monitor.get_dag_status_summary(),
+        "import_errors": len(dag_monitor.get_dag_import_errors()),
+    }
+    cache.set("api_overview", data, ttl=60)
     return jsonify(
         {
             "status": "success",
-            "data": {
-                "failure_stats": failure_monitor.get_failure_statistics(lookback_hours=24),
-                "sla_stats": sla_monitor.get_sla_statistics(lookback_hours=24),
-                "long_running_tasks": len(task_monitor.get_long_running_tasks(threshold_minutes=60)),
-                "zombie_count": len(task_monitor.get_zombie_tasks()),
-                "queue_status": scheduling_monitor.get_queued_tasks(),
-                "dag_summary": dag_monitor.get_dag_status_summary(),
-                "import_errors": len(dag_monitor.get_dag_import_errors()),
-            },
+            "data": data,
             "timestamp": timezone.utcnow().isoformat(),
         }
     )
