@@ -137,7 +137,8 @@ Then visit http://localhost:8080 (admin/admin) and navigate to the **Watcher** m
 
 See [demo/README.md](demo/README.md) for more details.
 
-## MWAA (Amazon Managed Workflows for Apache Airflow)
+<details>
+<summary><h2>MWAA Integration</h2></summary>
 
 ### Setup
 
@@ -199,6 +200,8 @@ echo "airflow-watcher==0.1.2" >> requirements/requirements.txt
 Visit `http://localhost:8080/api/watcher/health` to verify.
 
 > **Note:** If using Slack or PagerDuty notifications, ensure your MWAA VPC has a NAT gateway for outbound internet access.
+
+</details>
 
 ## Development
 
