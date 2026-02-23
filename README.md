@@ -137,6 +137,52 @@ Then visit http://localhost:8080 (admin/admin) and navigate to the **Watcher** m
 
 See [demo/README.md](demo/README.md) for more details.
 
+## MWAA (Amazon Managed Workflows for Apache Airflow)
+
+### Setup
+
+1. Add to your MWAA `requirements.txt` in S3:
+
+```
+airflow-watcher==0.1.2
+```
+
+For Prometheus metrics support:
+```
+airflow-watcher[all]==0.1.2
+```
+
+2. Update your MWAA environment to pick up the new requirements.
+
+3. Once the environment restarts, verify at:
+```
+https://<your-mwaa-url>/api/watcher/health
+```
+
+### Environment Variables (optional)
+
+Configure via MWAA Airflow configuration overrides:
+
+| Variable | Purpose |
+|---|---|
+| `AIRFLOW_WATCHER__SLACK_WEBHOOK_URL` | Slack notifications |
+| `AIRFLOW_WATCHER__PAGERDUTY_API_KEY` | PagerDuty alerts |
+| `AIRFLOW_WATCHER__ENABLE_PROMETHEUS` | Prometheus metrics |
+
+### Testing Locally with MWAA Local Runner
+
+```bash
+git clone https://github.com/aws/aws-mwaa-local-runner.git
+cd aws-mwaa-local-runner
+echo "airflow-watcher==0.1.2" >> requirements/requirements.txt
+./mwaa-local-env build-image
+./mwaa-local-env start
+```
+
+Visit `http://localhost:8080/api/watcher/health` to verify.
+
+> **Note:** If using Slack or PagerDuty notifications, ensure your MWAA VPC has a NAT gateway for outbound internet access.
+
 ## Development
 
 ```bash
