@@ -10,27 +10,37 @@ from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
 from airflow_watcher.monitors.sla_monitor import SLAMonitor
 from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
 from airflow_watcher.utils.helpers import get_all_dag_owners, get_all_dag_tags, get_dags_by_filter
+from airflow_watcher.utils.rbac import (
+    get_accessible_dag_ids,
+    get_rbac_context,
+    merge_rbac_with_filters,
+)
 
 
 def get_filter_context(request_args):
-    """Extract filter parameters and get available options."""
+    """Extract filter parameters, apply RBAC, and get available options."""
     tag = request_args.get("tag", "").strip() or None
     owner = request_args.get("owner", "").strip() or None
     hours = int(request_args.get("hours", 24))
 
-    # Get allowed DAG IDs based on filters
-    allowed_dag_ids = get_dags_by_filter(tag=tag, owner=owner)
+    # Voluntary tag/owner filter
+    filter_dag_ids = get_dags_by_filter(tag=tag, owner=owner)
+
+    # Mandatory RBAC filter — intersect with voluntary filters
+    rbac_dag_ids = get_accessible_dag_ids()
+    allowed_dag_ids = merge_rbac_with_filters(rbac_dag_ids, filter_dag_ids)
 
     return {
         "filters": {"tag": tag, "owner": owner, "hours": hours},
         "available_tags": get_all_dag_tags(),
         "available_owners": get_all_dag_owners(),
         "allowed_dag_ids": allowed_dag_ids,
+        **get_rbac_context(),
     }
 
 
 def filter_results(results, allowed_dag_ids, dag_id_key="dag_id"):
-    """Filter results by allowed DAG IDs."""
+    """Filter results by allowed DAG IDs (RBAC + voluntary filters)."""
     if allowed_dag_ids is None:
         return results
     if isinstance(results, list):
@@ -38,6 +48,56 @@ def filter_results(results, allowed_dag_ids, dag_id_key="dag_id"):
     elif isinstance(results, dict):
         return {k: v for k, v in results.items() if k in allowed_dag_ids}
     return results
+
+
+def _filter_aggregate_stats(stats, allowed_dag_ids):
+    """Filter aggregate statistics dict to only count accessible DAGs.
+
+    For stats dicts that contain a 'by_dag' or similar per-DAG breakdown,
+    recompute totals from the filtered subset. For flat stats, return as-is
+    when no restriction applies.
+    """
+    if allowed_dag_ids is None or not isinstance(stats, dict):
+        return stats
+
+    filtered = dict(stats)
+
+    # Filter per-DAG breakdowns commonly returned by monitors
+    for key in ("by_dag", "per_dag", "dag_stats", "dags"):
+        if key in filtered and isinstance(filtered[key], dict):
+            filtered[key] = {
+                dag_id: v
+                for dag_id, v in filtered[key].items()
+                if dag_id in allowed_dag_ids
+            }
+
+    # Recompute total counts from filtered per-DAG data if available
+    if "by_dag" in filtered and isinstance(filtered["by_dag"], dict):
+        filtered["total_failures"] = sum(
+            v if isinstance(v, (int, float)) else v.get("count", 0)
+            for v in filtered["by_dag"].values()
+        )
+        filtered["affected_dags"] = len(filtered["by_dag"])
+
+    return filtered
+
+
+def _filter_dag_summary(summary, allowed_dag_ids):
+    """Filter DAG status summary to only reflect accessible DAGs."""
+    if allowed_dag_ids is None or not isinstance(summary, dict):
+        return summary
+
+    filtered = dict(summary)
+
+    # Filter any per-DAG lists within the summary
+    for key in ("active_dags", "paused_dags", "dags"):
+        if key in filtered and isinstance(filtered[key], list):
+            filtered[key] = [
+                d for d in filtered[key]
+                if (d.get("dag_id") if isinstance(d, dict) else d) in allowed_dag_ids
+            ]
+
+    return filtered
 
 
 class WatcherDashboardView(BaseView):
@@ -62,15 +122,26 @@ class WatcherDashboardView(BaseView):
         long_running = filter_results(task_monitor.get_long_running_tasks(threshold_minutes=60), allowed)
         zombies = filter_results(task_monitor.get_zombie_tasks(), allowed)
 
+        # Filter aggregate stats so they only reflect accessible DAGs
+        failure_stats = _filter_aggregate_stats(
+            failure_monitor.get_failure_statistics(), allowed
+        )
+        sla_stats = _filter_aggregate_stats(
+            sla_monitor.get_sla_statistics(), allowed
+        )
+        dag_summary = _filter_dag_summary(
+            dag_monitor.get_dag_status_summary(), allowed
+        )
+
         context = {
             "recent_failures": recent_failures,
-            "failure_stats": failure_monitor.get_failure_statistics(),
+            "failure_stats": failure_stats,
             "sla_misses": sla_misses,
-            "sla_stats": sla_monitor.get_sla_statistics(),
+            "sla_stats": sla_stats,
             "long_running_count": len(long_running),
             "zombie_count": len(zombies),
             "queue_status": scheduling_monitor.get_queued_tasks(),
-            "dag_summary": dag_monitor.get_dag_status_summary(),
+            "dag_summary": dag_summary,
             "import_error_count": len(dag_monitor.get_dag_import_errors()),
             "show_hours_filter": False,
             **filter_ctx,
