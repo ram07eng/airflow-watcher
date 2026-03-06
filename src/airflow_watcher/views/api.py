@@ -10,20 +10,35 @@ from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
 from airflow_watcher.monitors.sla_monitor import SLAMonitor
 from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
 from airflow_watcher.utils.cache import MetricsCache
+from airflow_watcher.utils.rbac import (
+    filter_results_rbac,
+    get_accessible_dag_ids,
+)
 
 watcher_api_blueprint = Blueprint("watcher_api", __name__, url_prefix="/api/watcher")
+
+
+def _get_rbac_dag_ids():
+    """Get RBAC-enforced DAG IDs for the current API request."""
+    return get_accessible_dag_ids()
 
 
 @watcher_api_blueprint.route("/failures", methods=["GET"])
 def get_failures():
     """Get recent DAG failures via API."""
     failure_monitor = DAGFailureMonitor()
+    allowed = _get_rbac_dag_ids()
 
     dag_id = request.args.get("dag_id")
     hours = int(request.args.get("hours", 24))
     limit = int(request.args.get("limit", 50))
 
+    # If user requests a specific dag_id, verify they have access
+    if dag_id and allowed is not None and dag_id not in allowed:
+        return jsonify({"status": "error", "message": "Access denied for this DAG"}), 403
+
     failures = failure_monitor.get_recent_failures(dag_id=dag_id, lookback_hours=hours, limit=limit)
+    failures = filter_results_rbac(failures, allowed)
 
     return jsonify(
         {
@@ -59,12 +74,17 @@ def get_failure_stats():
 def get_sla_misses():
     """Get SLA misses via API."""
     sla_monitor = SLAMonitor()
+    allowed = _get_rbac_dag_ids()
 
     dag_id = request.args.get("dag_id")
     hours = int(request.args.get("hours", 24))
     limit = int(request.args.get("limit", 50))
 
+    if dag_id and allowed is not None and dag_id not in allowed:
+        return jsonify({"status": "error", "message": "Access denied for this DAG"}), 403
+
     sla_misses = sla_monitor.get_recent_sla_misses(dag_id=dag_id, lookback_hours=hours, limit=limit)
+    sla_misses = filter_results_rbac(sla_misses, allowed)
 
     return jsonify(
         {
@@ -142,6 +162,10 @@ def get_health():
 @watcher_api_blueprint.route("/health/<dag_id>", methods=["GET"])
 def get_dag_health(dag_id: str):
     """Get health status for a specific DAG."""
+    allowed = _get_rbac_dag_ids()
+    if allowed is not None and dag_id not in allowed:
+        return jsonify({"status": "error", "message": "Access denied for this DAG"}), 403
+
     failure_monitor = DAGFailureMonitor()
     sla_monitor = SLAMonitor()
 
@@ -170,9 +194,12 @@ def get_dag_health(dag_id: str):
 def get_long_running_tasks():
     """Get tasks running longer than expected."""
     monitor = TaskHealthMonitor()
+    allowed = _get_rbac_dag_ids()
     threshold = int(request.args.get("threshold_minutes", 60))
 
-    tasks = monitor.get_long_running_tasks(threshold_minutes=threshold)
+    tasks = filter_results_rbac(
+        monitor.get_long_running_tasks(threshold_minutes=threshold), allowed
+    )
 
     return jsonify(
         {
@@ -191,10 +218,13 @@ def get_long_running_tasks():
 def get_retry_heavy_tasks():
     """Get tasks with excessive retries."""
     monitor = TaskHealthMonitor()
+    allowed = _get_rbac_dag_ids()
     hours = int(request.args.get("hours", 24))
     min_retries = int(request.args.get("min_retries", 2))
 
-    tasks = monitor.get_retry_heavy_tasks(lookback_hours=hours, min_retries=min_retries)
+    tasks = filter_results_rbac(
+        monitor.get_retry_heavy_tasks(lookback_hours=hours, min_retries=min_retries), allowed
+    )
 
     return jsonify(
         {
@@ -212,9 +242,12 @@ def get_retry_heavy_tasks():
 def get_zombie_tasks():
     """Get potential zombie tasks."""
     monitor = TaskHealthMonitor()
+    allowed = _get_rbac_dag_ids()
     threshold = int(request.args.get("threshold_minutes", 120))
 
-    zombies = monitor.get_zombie_tasks(zombie_threshold_minutes=threshold)
+    zombies = filter_results_rbac(
+        monitor.get_zombie_tasks(zombie_threshold_minutes=threshold), allowed
+    )
 
     return jsonify(
         {
@@ -233,9 +266,12 @@ def get_zombie_tasks():
 def get_task_failure_patterns():
     """Get task failure pattern analysis."""
     monitor = TaskHealthMonitor()
+    allowed = _get_rbac_dag_ids()
     hours = int(request.args.get("hours", 168))  # 7 days default
 
-    patterns = monitor.get_task_failure_patterns(lookback_hours=hours)
+    patterns = filter_results_rbac(
+        monitor.get_task_failure_patterns(lookback_hours=hours), allowed
+    )
 
     return jsonify(
         {
@@ -253,6 +289,7 @@ def get_task_failure_patterns():
 def get_scheduling_lag():
     """Get scheduling lag analysis."""
     monitor = SchedulingMonitor()
+    allowed = _get_rbac_dag_ids()
     hours = int(request.args.get("hours", 24))
     threshold = int(request.args.get("threshold_minutes", 10))
 
@@ -260,6 +297,12 @@ def get_scheduling_lag():
         lookback_hours=hours,
         lag_threshold_minutes=threshold,
     )
+
+    # Filter delayed_dags within the lag data
+    if allowed is not None and "delayed_dags" in lag_data:
+        lag_data["delayed_dags"] = [
+            d for d in lag_data["delayed_dags"] if d.get("dag_id") in allowed
+        ]
 
     return jsonify(
         {
@@ -309,9 +352,12 @@ def get_pool_utilization():
 def get_stale_dags():
     """Get DAGs that haven't run when expected."""
     monitor = SchedulingMonitor()
+    allowed = _get_rbac_dag_ids()
     hours = int(request.args.get("expected_interval_hours", 24))
 
-    stale = monitor.get_stale_dags(expected_interval_hours=hours)
+    stale = filter_results_rbac(
+        monitor.get_stale_dags(expected_interval_hours=hours), allowed
+    )
 
     return jsonify(
         {
@@ -329,8 +375,13 @@ def get_stale_dags():
 def get_concurrent_runs():
     """Get DAGs with multiple concurrent runs."""
     monitor = SchedulingMonitor()
+    allowed = _get_rbac_dag_ids()
 
     concurrent = monitor.get_concurrent_runs()
+
+    # Filter if concurrent is a list of dicts
+    if allowed is not None and isinstance(concurrent, list):
+        concurrent = [c for c in concurrent if c.get("dag_id") in allowed]
 
     return jsonify(
         {
@@ -383,8 +434,11 @@ def get_dag_status_summary():
 def get_dag_complexity():
     """Get DAG complexity analysis."""
     monitor = DAGHealthMonitor()
+    allowed = _get_rbac_dag_ids()
 
-    complexity = monitor.get_dag_complexity_analysis()
+    complexity = filter_results_rbac(
+        monitor.get_dag_complexity_analysis(), allowed
+    )
 
     return jsonify(
         {
@@ -402,9 +456,12 @@ def get_dag_complexity():
 def get_inactive_dags():
     """Get inactive DAGs."""
     monitor = DAGHealthMonitor()
+    allowed = _get_rbac_dag_ids()
     days = int(request.args.get("days", 30))
 
-    inactive = monitor.get_inactive_dags(inactive_days=days)
+    inactive = filter_results_rbac(
+        monitor.get_inactive_dags(inactive_days=days), allowed
+    )
 
     return jsonify(
         {
@@ -426,9 +483,12 @@ def get_inactive_dags():
 def get_upstream_failures():
     """Get tasks in upstream_failed state."""
     monitor = DependencyMonitor()
+    allowed = _get_rbac_dag_ids()
     hours = int(request.args.get("hours", 24))
 
-    failures = monitor.get_upstream_failures(lookback_hours=hours)
+    failures = filter_results_rbac(
+        monitor.get_upstream_failures(lookback_hours=hours), allowed
+    )
 
     return jsonify(
         {
@@ -481,6 +541,10 @@ def get_failure_correlations():
 @watcher_api_blueprint.route("/dependencies/impact/<dag_id>/<task_id>", methods=["GET"])
 def get_task_failure_impact(dag_id: str, task_id: str):
     """Get downstream impact of a task failure."""
+    allowed = _get_rbac_dag_ids()
+    if allowed is not None and dag_id not in allowed:
+        return jsonify({"status": "error", "message": "Access denied for this DAG"}), 403
+
     monitor = DependencyMonitor()
 
     impact = monitor.get_cascading_failure_impact(dag_id=dag_id, task_id=task_id)
@@ -499,9 +563,17 @@ def get_task_failure_impact(dag_id: str, task_id: str):
 
 @watcher_api_blueprint.route("/overview", methods=["GET"])
 def get_full_overview():
-    """Get comprehensive monitoring overview with caching."""
+    """Get comprehensive monitoring overview with caching.
+
+    Note: The overview is RBAC-aware. Cached data is keyed per-user so
+    restricted users don't see cached admin data.
+    """
+    allowed = _get_rbac_dag_ids()
     cache = MetricsCache.get_instance()
-    cached = cache.get("api_overview")
+
+    # Use a user-scoped cache key so RBAC boundaries are respected
+    cache_key = "api_overview" if allowed is None else f"api_overview:{hash(frozenset(allowed))}"
+    cached = cache.get(cache_key)
     if cached is not None:
         return jsonify({"status": "success", "data": cached, "timestamp": timezone.utcnow().isoformat()})
 
@@ -511,16 +583,21 @@ def get_full_overview():
     scheduling_monitor = SchedulingMonitor()
     dag_monitor = DAGHealthMonitor()
 
+    long_running = filter_results_rbac(
+        task_monitor.get_long_running_tasks(threshold_minutes=60), allowed
+    )
+    zombies = filter_results_rbac(task_monitor.get_zombie_tasks(), allowed)
+
     data = {
         "failure_stats": failure_monitor.get_failure_statistics(lookback_hours=24),
         "sla_stats": sla_monitor.get_sla_statistics(lookback_hours=24),
-        "long_running_tasks": len(task_monitor.get_long_running_tasks(threshold_minutes=60)),
-        "zombie_count": len(task_monitor.get_zombie_tasks()),
+        "long_running_tasks": len(long_running),
+        "zombie_count": len(zombies),
         "queue_status": scheduling_monitor.get_queued_tasks(),
         "dag_summary": dag_monitor.get_dag_status_summary(),
         "import_errors": len(dag_monitor.get_dag_import_errors()),
     }
-    cache.set("api_overview", data, ttl=60)
+    cache.set(cache_key, data, ttl=60)
     return jsonify(
         {
             "status": "success",

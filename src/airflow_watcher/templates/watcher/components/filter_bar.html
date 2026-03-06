@@ -92,8 +92,17 @@
     </form>
     
     <!-- Active Filters Badge -->
-    {% if filters.tag or filters.owner %}
-    <div style="margin-left: auto; display: flex; gap: 8px;">
+    {% if filters.tag or filters.owner or (rbac_active and not rbac_is_admin) %}
+    <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+        {% if rbac_active and not rbac_is_admin %}
+        <span style="
+            background: #fff3e0;
+            color: #e65100;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+        " title="You are viewing DAGs assigned to your role. Contact an admin to change access.">🔒 {{ rbac_user }}</span>
+        {% endif %}
         {% if filters.tag %}
         <span style="
             background: #e3f2fd;
