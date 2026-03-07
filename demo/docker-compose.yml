@@ -103,5 +103,96 @@ services:
     volumes:
       - .:/sources
 
+  # Creates RBAC test users with different DAG-level permissions.
+  # Run after airflow-init: docker-compose up rbac-setup
+  rbac-setup:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        echo "=== Creating RBAC test roles and users ==="
+
+        # Helper function to add common UI permissions to a role
+        add_ui_perms() {
+          local ROLE=$$1
+          # Read permissions for UI resources
+          for RES in Website "Watcher Dashboard" "Audit Logs" "DAG Dependencies" \
+                     "DAG Code" "DAG Runs" "Datasets" "Cluster Activity" "ImportError" \
+                     "DAG Warnings" "Jobs" "My Password" "My Profile" "Plugins" \
+                     "SLA Misses" "Task Instances" "Task Logs" "XComs"; do
+            airflow roles add-perms "$$ROLE" -a can_read -r "$$RES" 2>/dev/null || true
+          done
+          # Edit own profile
+          for RES in "My Password" "My Profile"; do
+            airflow roles add-perms "$$ROLE" -a can_edit -r "$$RES" 2>/dev/null || true
+          done
+          # Allow triggering DAG runs
+          airflow roles add-perms "$$ROLE" -a can_create -r "DAG Runs" 2>/dev/null || true
+          # Menu access for Airflow menus
+          for RES in "Browse" "DAGs" "DAG Dependencies" "DAG Runs" "Datasets" \
+                     "Cluster Activity" "Documentation" "Docs" "Jobs" "Audit Logs" \
+                     "Plugins" "SLA Misses" "Task Instances"; do
+            airflow roles add-perms "$$ROLE" -a menu_access -r "$$RES" 2>/dev/null || true
+          done
+          # Menu access for Watcher plugin
+          for RES in "Watcher" "Watcher Dashboard" "Airflow Dashboard" "Airflow Health" \
+                     "DAG Failures" "DAG Scheduling" "Dependencies" "SLA Tracker" "Task Health"; do
+            airflow roles add-perms "$$ROLE" -a menu_access -r "$$RES" 2>/dev/null || true
+          done
+        }
+
+        # Helper to add DAG-level read/edit/delete/trigger permissions
+        add_dag_perms() {
+          local ROLE=$$1
+          local DAG_ID=$$2
+          for ACTION in can_read can_edit can_delete; do
+            airflow roles add-perms "$$ROLE" -a "$$ACTION" -r "DAG:$$DAG_ID" 2>/dev/null || true
+          done
+        }
+
+        # --- Role: team_weather ---
+        airflow roles create team_weather 2>/dev/null || true
+        add_ui_perms team_weather
+        add_dag_perms team_weather weather_data_pipeline
+        add_dag_perms team_weather stock_market_collector
+
+        # --- Role: team_ecommerce ---
+        airflow roles create team_ecommerce 2>/dev/null || true
+        add_ui_perms team_ecommerce
+        add_dag_perms team_ecommerce ecommerce_sales_etl
+        add_dag_perms team_ecommerce data_quality_checks
+
+        # --- User: weather_user (password: WEATHER_PASS) ---
+        airflow users create \
+          --username weather_user \
+          --password WEATHER_PASS \
+          --firstname Weather \
+          --lastname Team \
+          --role team_weather \
+          --email weather@example.com 2>/dev/null || true
+
+        # --- User: ecommerce_user (password: ECOMMERCE_PASS) ---
+        airflow users create \
+          --username ecommerce_user \
+          --password ECOMMERCE_PASS \
+          --firstname Ecommerce \
+          --lastname Team \
+          --role team_ecommerce \
+          --email ecommerce@example.com 2>/dev/null || true
+
+        echo ""
+        echo "=== RBAC test users created ==="
+        echo ""
+        echo "  admin                             → sees ALL DAGs (Admin role)"
+        echo "  weather_user   / WEATHER_PASS     → sees only weather_data_pipeline, stock_market_collector"
+        echo "  ecommerce_user / ECOMMERCE_PASS   → sees only ecommerce_sales_etl, data_quality_checks"
+        echo ""
+        echo "Log in with each user at http://localhost:8080 and check the Watcher dashboard."
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
 volumes:
   postgres-db-volume:

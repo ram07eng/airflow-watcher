@@ -237,6 +237,9 @@ with DAG(
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["data-quality", "monitoring", "critical"],
+    access_control={
+        "team_ecommerce": {"can_read", "can_edit", "can_delete"},
+    },
 ) as dag:
 
     start = EmptyOperator(task_id="start")

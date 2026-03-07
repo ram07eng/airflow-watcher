@@ -24,6 +24,24 @@ docker-compose down
 - **Username**: admin
 - **Password**: admin
 
+### RBAC Test Users
+
+To test role-based access control, create the test users after starting the environment:
+
+```bash
+make rbac-setup
+```
+
+This creates three users with different DAG access levels:
+
+| User | Password | Role | Visible DAGs |
+|------|----------|------|-------------|
+| `admin` | `admin` | Admin | All DAGs |
+| `weather_user` | `WEATHER_PASS` | team_weather | `weather_data_pipeline`, `stock_market_collector` |
+| `ecommerce_user` | `ECOMMERCE_PASS` | team_ecommerce | `ecommerce_sales_etl`, `data_quality_checks` |
+
+Log in with each user and navigate to the Watcher dashboard to verify that each user only sees their team's DAGs in failures, SLA misses, health status, and all other views.
+
 ## Sample DAGs
 
 | DAG | Schedule | Description | Failure Rate |
