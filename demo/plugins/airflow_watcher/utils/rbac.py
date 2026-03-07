@@ -5,7 +5,7 @@ access control. Teams only see DAGs they have permission to view.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Optional, Set
 
 from flask import has_request_context
 
