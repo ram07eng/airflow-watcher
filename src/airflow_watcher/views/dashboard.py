@@ -45,7 +45,8 @@ def filter_results(results, allowed_dag_ids, dag_id_key="dag_id"):
         return results
     if isinstance(results, list):
         return [
-            r for r in results
+            r
+            for r in results
             if (r.get(dag_id_key) if isinstance(r, dict) else getattr(r, dag_id_key, None)) in allowed_dag_ids
         ]
     elif isinstance(results, dict):
@@ -65,29 +66,26 @@ def _filter_aggregate_stats(stats, allowed_dag_ids):
 
     # Filter all per-DAG breakdowns (lists and dicts)
     dag_list_keys = (
-        "by_dag", "per_dag", "dag_stats", "dags",
-        "most_failing_dags", "top_dags_with_misses", "top_tasks_with_misses",
+        "by_dag",
+        "per_dag",
+        "dag_stats",
+        "dags",
+        "most_failing_dags",
+        "top_dags_with_misses",
+        "top_tasks_with_misses",
     )
     for key in dag_list_keys:
         if key not in filtered:
             continue
         val = filtered[key]
         if isinstance(val, dict):
-            filtered[key] = {
-                dag_id: v for dag_id, v in val.items()
-                if dag_id in allowed_dag_ids
-            }
+            filtered[key] = {dag_id: v for dag_id, v in val.items() if dag_id in allowed_dag_ids}
         elif isinstance(val, list):
-            filtered[key] = [
-                item for item in val
-                if _get_dag_id(item) in allowed_dag_ids
-            ]
+            filtered[key] = [item for item in val if _get_dag_id(item) in allowed_dag_ids]
 
     # Recompute failure stats from most_failing_dags
     if "most_failing_dags" in filtered and isinstance(filtered["most_failing_dags"], list):
-        total_failures = sum(
-            d.get("failure_count", 0) for d in filtered["most_failing_dags"] if isinstance(d, dict)
-        )
+        total_failures = sum(d.get("failure_count", 0) for d in filtered["most_failing_dags"] if isinstance(d, dict))
         filtered["failed_runs"] = total_failures
         filtered["total_task_failures"] = total_failures
         # We can't know exact success_runs per-DAG, so derive from total
@@ -103,15 +101,14 @@ def _filter_aggregate_stats(stats, allowed_dag_ids):
         else:
             filtered["success_runs"] = 0
             filtered["total_runs"] = total_failures
-        filtered["failure_rate"] = round(
-            total_failures / filtered["total_runs"] * 100, 2
-        ) if filtered["total_runs"] else 0
+        filtered["failure_rate"] = (
+            round(total_failures / filtered["total_runs"] * 100, 2) if filtered["total_runs"] else 0
+        )
 
     # Recompute from by_dag dict
     if "by_dag" in filtered and isinstance(filtered["by_dag"], dict):
         filtered["total_failures"] = sum(
-            v if isinstance(v, (int, float)) else v.get("count", 0)
-            for v in filtered["by_dag"].values()
+            v if isinstance(v, (int, float)) else v.get("count", 0) for v in filtered["by_dag"].values()
         )
         filtered["affected_dags"] = len(filtered["by_dag"])
 
@@ -150,10 +147,7 @@ def _filter_dag_summary(summary, allowed_dag_ids):
     # Filter any per-DAG lists within the summary
     for key in ("active_dags", "paused_dags", "dags"):
         if key in filtered and isinstance(filtered[key], list):
-            filtered[key] = [
-                d for d in filtered[key]
-                if _get_dag_id(d) in allowed_dag_ids
-            ]
+            filtered[key] = [d for d in filtered[key] if _get_dag_id(d) in allowed_dag_ids]
 
     # Recompute flat counts to match the user's accessible DAGs
     num_allowed = len(allowed_dag_ids)
@@ -204,15 +198,9 @@ class WatcherDashboardView(BaseView):
         zombies = filter_results(task_monitor.get_zombie_tasks(), allowed)
 
         # Filter aggregate stats so they only reflect accessible DAGs
-        failure_stats = _filter_aggregate_stats(
-            failure_monitor.get_failure_statistics(), allowed
-        )
-        sla_stats = _filter_aggregate_stats(
-            sla_monitor.get_sla_statistics(), allowed
-        )
-        dag_summary = _filter_dag_summary(
-            dag_monitor.get_dag_status_summary(), allowed
-        )
+        failure_stats = _filter_aggregate_stats(failure_monitor.get_failure_statistics(), allowed)
+        sla_stats = _filter_aggregate_stats(sla_monitor.get_sla_statistics(), allowed)
+        dag_summary = _filter_dag_summary(dag_monitor.get_dag_status_summary(), allowed)
 
         context = {
             "recent_failures": recent_failures,
@@ -405,15 +393,9 @@ class WatcherDashboardView(BaseView):
         # Filter cross-DAG dependencies and correlations
         if allowed is not None:
             if isinstance(cross_dag_deps, list):
-                cross_dag_deps = [
-                    d for d in cross_dag_deps
-                    if _get_dag_id(d) in allowed
-                ]
+                cross_dag_deps = [d for d in cross_dag_deps if _get_dag_id(d) in allowed]
             if isinstance(correlations, list):
-                correlations = [
-                    c for c in correlations
-                    if _get_dag_id(c) in allowed
-                ]
+                correlations = [c for c in correlations if _get_dag_id(c) in allowed]
 
         context = {
             "upstream_failures": upstream_failures,

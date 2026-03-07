@@ -128,7 +128,7 @@ def _resolve_from_permissions(user, security_manager) -> Optional[Set[str]]:
 
         # DAG-level read permissions look like: can_read on DAG:<dag_id>
         if action_name == perms.ACTION_CAN_READ and resource_name.startswith(perms.RESOURCE_DAG_PREFIX):
-            dag_id = resource_name[len(perms.RESOURCE_DAG_PREFIX):]
+            dag_id = resource_name[len(perms.RESOURCE_DAG_PREFIX) :]
             dag_ids.add(dag_id)
 
     return dag_ids if dag_ids else set()
@@ -172,7 +172,8 @@ def filter_results_rbac(
         return results
     if isinstance(results, list):
         return [
-            r for r in results
+            r
+            for r in results
             if (r.get(dag_id_key) if isinstance(r, dict) else getattr(r, dag_id_key, None)) in allowed_dag_ids
         ]
     elif isinstance(results, dict):
