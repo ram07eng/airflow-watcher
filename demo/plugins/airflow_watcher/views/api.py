@@ -197,9 +197,7 @@ def get_long_running_tasks():
     allowed = _get_rbac_dag_ids()
     threshold = int(request.args.get("threshold_minutes", 60))
 
-    tasks = filter_results_rbac(
-        monitor.get_long_running_tasks(threshold_minutes=threshold), allowed
-    )
+    tasks = filter_results_rbac(monitor.get_long_running_tasks(threshold_minutes=threshold), allowed)
 
     return jsonify(
         {
@@ -222,9 +220,7 @@ def get_retry_heavy_tasks():
     hours = int(request.args.get("hours", 24))
     min_retries = int(request.args.get("min_retries", 2))
 
-    tasks = filter_results_rbac(
-        monitor.get_retry_heavy_tasks(lookback_hours=hours, min_retries=min_retries), allowed
-    )
+    tasks = filter_results_rbac(monitor.get_retry_heavy_tasks(lookback_hours=hours, min_retries=min_retries), allowed)
 
     return jsonify(
         {
@@ -245,9 +241,7 @@ def get_zombie_tasks():
     allowed = _get_rbac_dag_ids()
     threshold = int(request.args.get("threshold_minutes", 120))
 
-    zombies = filter_results_rbac(
-        monitor.get_zombie_tasks(zombie_threshold_minutes=threshold), allowed
-    )
+    zombies = filter_results_rbac(monitor.get_zombie_tasks(zombie_threshold_minutes=threshold), allowed)
 
     return jsonify(
         {
@@ -269,9 +263,7 @@ def get_task_failure_patterns():
     allowed = _get_rbac_dag_ids()
     hours = int(request.args.get("hours", 168))  # 7 days default
 
-    patterns = filter_results_rbac(
-        monitor.get_task_failure_patterns(lookback_hours=hours), allowed
-    )
+    patterns = filter_results_rbac(monitor.get_task_failure_patterns(lookback_hours=hours), allowed)
 
     return jsonify(
         {
@@ -300,9 +292,7 @@ def get_scheduling_lag():
 
     # Filter delayed_dags within the lag data
     if allowed is not None and "delayed_dags" in lag_data:
-        lag_data["delayed_dags"] = [
-            d for d in lag_data["delayed_dags"] if d.get("dag_id") in allowed
-        ]
+        lag_data["delayed_dags"] = [d for d in lag_data["delayed_dags"] if d.get("dag_id") in allowed]
 
     return jsonify(
         {
@@ -355,9 +345,7 @@ def get_stale_dags():
     allowed = _get_rbac_dag_ids()
     hours = int(request.args.get("expected_interval_hours", 24))
 
-    stale = filter_results_rbac(
-        monitor.get_stale_dags(expected_interval_hours=hours), allowed
-    )
+    stale = filter_results_rbac(monitor.get_stale_dags(expected_interval_hours=hours), allowed)
 
     return jsonify(
         {
@@ -436,9 +424,7 @@ def get_dag_complexity():
     monitor = DAGHealthMonitor()
     allowed = _get_rbac_dag_ids()
 
-    complexity = filter_results_rbac(
-        monitor.get_dag_complexity_analysis(), allowed
-    )
+    complexity = filter_results_rbac(monitor.get_dag_complexity_analysis(), allowed)
 
     return jsonify(
         {
@@ -459,9 +445,7 @@ def get_inactive_dags():
     allowed = _get_rbac_dag_ids()
     days = int(request.args.get("days", 30))
 
-    inactive = filter_results_rbac(
-        monitor.get_inactive_dags(inactive_days=days), allowed
-    )
+    inactive = filter_results_rbac(monitor.get_inactive_dags(inactive_days=days), allowed)
 
     return jsonify(
         {
@@ -486,9 +470,7 @@ def get_upstream_failures():
     allowed = _get_rbac_dag_ids()
     hours = int(request.args.get("hours", 24))
 
-    failures = filter_results_rbac(
-        monitor.get_upstream_failures(lookback_hours=hours), allowed
-    )
+    failures = filter_results_rbac(monitor.get_upstream_failures(lookback_hours=hours), allowed)
 
     return jsonify(
         {
@@ -583,9 +565,7 @@ def get_full_overview():
     scheduling_monitor = SchedulingMonitor()
     dag_monitor = DAGHealthMonitor()
 
-    long_running = filter_results_rbac(
-        task_monitor.get_long_running_tasks(threshold_minutes=60), allowed
-    )
+    long_running = filter_results_rbac(task_monitor.get_long_running_tasks(threshold_minutes=60), allowed)
     zombies = filter_results_rbac(task_monitor.get_zombie_tasks(), allowed)
 
     data = {
