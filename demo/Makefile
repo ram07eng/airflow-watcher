@@ -81,6 +81,16 @@ trigger-failures:
 check-plugin:
 	docker-compose exec airflow-webserver airflow plugins
 
+# Create RBAC test users (run after start)
+rbac-setup:
+	@echo "Creating RBAC test users..."
+	docker-compose up rbac-setup
+	@echo ""
+	@echo "Test users ready! Log in at http://localhost:8080"
+	@echo "  admin                             → sees ALL DAGs"
+	@echo "  weather_user   / WEATHER_PASS     → sees only weather + stock DAGs"
+	@echo "  ecommerce_user / ECOMMERCE_PASS   → sees only ecommerce + data quality DAGs"
+
 # Clean up everything
 clean:
 	@echo "Cleaning up Airflow environment..."
