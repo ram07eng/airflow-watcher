@@ -94,8 +94,6 @@ def _filter_aggregate_stats(stats, allowed_dag_ids):
         orig_total = stats.get("total_runs", 0)
         orig_failed = stats.get("failed_runs", 0)
         orig_success = stats.get("success_runs", 0)
-        # Removed failures = original failures - filtered failures
-        removed_failures = orig_failed - total_failures
         # Approximate: remove proportional success runs too
         if orig_total > 0 and orig_failed > 0:
             # Ratio of removed DAGs' runs to total
