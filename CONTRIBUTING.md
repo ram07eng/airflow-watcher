@@ -54,7 +54,7 @@ make check
 ```bash
 cd demo
 docker-compose up -d
-# Visit http://localhost:8080 (admin/****)
+# Visit http://localhost:8080
 ```
 
 ## Project Structure

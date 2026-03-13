@@ -164,19 +164,19 @@ services:
         add_dag_perms team_ecommerce ecommerce_sales_etl
         add_dag_perms team_ecommerce data_quality_checks
 
-        # --- User: weather_user (password: WEATHER_PASS) ---
+        # --- User: weather_user ---
         airflow users create \
           --username weather_user \
-          --password WEATHER_PASS \
+          --password "$${WEATHER_USER_PASSWORD:-WEATHER_PASS}" \
           --firstname Weather \
           --lastname Team \
           --role team_weather \
           --email weather@example.com 2>/dev/null || true
 
-        # --- User: ecommerce_user (password: ECOMMERCE_PASS) ---
+        # --- User: ecommerce_user ---
         airflow users create \
           --username ecommerce_user \
-          --password ECOMMERCE_PASS \
+          --password "$${ECOMMERCE_USER_PASSWORD:-ECOMMERCE_PASS}" \
           --firstname Ecommerce \
           --lastname Team \
           --role team_ecommerce \
@@ -185,11 +185,12 @@ services:
         echo ""
         echo "=== RBAC test users created ==="
         echo ""
-        echo "  admin                             → sees ALL DAGs (Admin role)"
-        echo "  weather_user   / WEATHER_PASS     → sees only weather_data_pipeline, stock_market_collector"
-        echo "  ecommerce_user / ECOMMERCE_PASS   → sees only ecommerce_sales_etl, data_quality_checks"
+        echo "  admin          → sees ALL DAGs (Admin role)"
+        echo "  weather_user   → sees only weather_data_pipeline, stock_market_collector"
+        echo "  ecommerce_user → sees only ecommerce_sales_etl, data_quality_checks"
         echo ""
-        echo "Log in with each user at http://localhost:8080 and check the Watcher dashboard."
+        echo "Passwords are set via env vars or defaults. Check docker-compose.yml."
+        echo "Log in at http://localhost:8080 and check the Watcher dashboard."
     depends_on:
       airflow-init:
         condition: service_completed_successfully

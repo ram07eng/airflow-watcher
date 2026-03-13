@@ -71,7 +71,7 @@ docker-up:
 	@echo ""
 	@echo "  Airflow UI:    http://localhost:8080"
 	@echo "  Username:      admin"
-	@echo "  Password:      (see docker-compose.yml)"
+	@echo "  Password:      (see demo/docker-compose.yml)"
 	@echo ""
 	@echo "  Watcher Views:"
 	@echo "    Dashboard:    http://localhost:8080/watcher/dashboard"
