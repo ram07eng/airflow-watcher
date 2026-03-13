@@ -87,9 +87,10 @@ rbac-setup:
 	docker-compose up rbac-setup
 	@echo ""
 	@echo "Test users ready! Log in at http://localhost:8080"
-	@echo "  admin                             → sees ALL DAGs"
-	@echo "  weather_user   / WEATHER_PASS     → sees only weather + stock DAGs"
-	@echo "  ecommerce_user / ECOMMERCE_PASS   → sees only ecommerce + data quality DAGs"
+	@echo "  admin          → sees ALL DAGs"
+	@echo "  weather_user   → sees only weather + stock DAGs"
+	@echo "  ecommerce_user → sees only ecommerce + data quality DAGs"
+	@echo "  (passwords in docker-compose.yml)"
 
 # Clean up everything
 clean:

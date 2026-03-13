@@ -18,6 +18,7 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 import time
 from dataclasses import dataclass, field
@@ -46,9 +47,9 @@ FORBIDDEN_DAGS = {
 }
 
 USERS = [
-    {"username": "admin", "password": "admin", "role": "admin"},
-    {"username": "weather_user", "password": "WEATHER_PASS", "role": "weather"},
-    {"username": "ecommerce_user", "password": "ECOMMERCE_PASS", "role": "ecommerce"},
+    {"username": "admin", "password": os.environ.get("ADMIN_PASSWORD", "admin"), "role": "admin"},
+    {"username": "weather_user", "password": os.environ.get("WEATHER_USER_PASSWORD", "WEATHER_PASS"), "role": "weather"},
+    {"username": "ecommerce_user", "password": os.environ.get("ECOMMERCE_USER_PASSWORD", "ECOMMERCE_PASS"), "role": "ecommerce"},
 ]
 
 WATCHER_PAGES = [

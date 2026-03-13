@@ -108,11 +108,13 @@ Then create matching roles in Airflow (Admin → Security → List Roles) and as
 
 The demo environment includes pre-configured RBAC users:
 
-| User | Password | Role | Visible DAGs |
-|------|----------|------|-------------|
-| `admin` | `admin` | Admin | All 8 DAGs |
-| `weather_user` | `WEATHER_PASS` | team_weather | weather_data_pipeline, stock_market_collector |
-| `ecommerce_user` | `ECOMMERCE_PASS` | team_ecommerce | ecommerce_sales_etl, data_quality_checks |
+| User | Role | Visible DAGs |
+|------|------|-------------|
+| `admin` | Admin | All 8 DAGs |
+| `weather_user` | team_weather | weather_data_pipeline, stock_market_collector |
+| `ecommerce_user` | team_ecommerce | ecommerce_sales_etl, data_quality_checks |
+
+Passwords are configured in `demo/docker-compose.yml`. Change them before any shared deployment.
 
 ```bash
 cd demo
@@ -192,7 +194,7 @@ cd demo
 docker-compose up -d
 ```
 
-Then visit http://localhost:8080 (admin/****) and navigate to the **Watcher** menu.
+Then visit http://localhost:8080 and navigate to the **Watcher** menu.
 
 See [demo/README.md](demo/README.md) for more details.
 

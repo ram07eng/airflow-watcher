@@ -22,7 +22,7 @@ docker-compose down
 
 - **Airflow UI**: http://localhost:8080
 - **Username**: admin
-- **Password**: admin
+- **Password**: See `docker-compose.yml`
 
 ### RBAC Test Users
 
@@ -34,11 +34,13 @@ make rbac-setup
 
 This creates three users with different DAG access levels:
 
-| User | Password | Role | Visible DAGs |
-|------|----------|------|-------------|
-| `admin` | `admin` | Admin | All DAGs |
-| `weather_user` | `WEATHER_PASS` | team_weather | `weather_data_pipeline`, `stock_market_collector` |
-| `ecommerce_user` | `ECOMMERCE_PASS` | team_ecommerce | `ecommerce_sales_etl`, `data_quality_checks` |
+| User | Role | Visible DAGs |
+|------|------|-------------|
+| `admin` | Admin | All DAGs |
+| `weather_user` | team_weather | `weather_data_pipeline`, `stock_market_collector` |
+| `ecommerce_user` | team_ecommerce | `ecommerce_sales_etl`, `data_quality_checks` |
+
+Passwords are configured in `docker-compose.yml`.
 
 Log in with each user and navigate to the Watcher dashboard to verify that each user only sees their team's DAGs in failures, SLA misses, health status, and all other views.
 
