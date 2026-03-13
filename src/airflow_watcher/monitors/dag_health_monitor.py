@@ -182,7 +182,7 @@ class DAGHealthMonitor:
             if i >= limit:
                 break
             task_count = len(dag.tasks)
-            dependency_count = sum(len(task.upstream_list) for task in dag.tasks)
+            dependency_count = sum(len(task.upstream_list) for task in dag.tasks)  # type: ignore[misc]
             max_depth = self._calculate_dag_depth(dag)
 
             complexity_data.append(
@@ -194,7 +194,7 @@ class DAGHealthMonitor:
                     "avg_dependencies_per_task": round(dependency_count / task_count, 2) if task_count > 0 else 0,
                     "schedule_interval": str(dag.schedule_interval),
                     "is_paused": dag.is_paused,
-                    "tags": [t.name for t in dag.tags] if dag.tags else [],
+                    "tags": [t.name for t in dag.tags] if dag.tags else [],  # type: ignore[attr-defined]
                 }
             )
 
