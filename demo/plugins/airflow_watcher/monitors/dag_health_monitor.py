@@ -133,24 +133,26 @@ class DAGHealthMonitor:
         from airflow.models.serialized_dag import SerializedDagModel
 
         try:
-            # Query serialized DAGs for task counts without loading DagBag
-            serialized_dags = session.query(SerializedDagModel.dag_id, SerializedDagModel.data).limit(limit).all()
+            # Query full objects — .data is a property, not a column
+            serialized_dags = session.query(SerializedDagModel).limit(limit).all()
         except Exception as e:
             logger.warning(f"SerializedDagModel query failed, falling back to DagBag: {e}")
             return self._compute_complexity_dagbag(limit)
 
         complexity_data = []
-        for dag_id, data in serialized_dags:
+        for sdm in serialized_dags:
+            dag_id = sdm.dag_id
+            data = sdm.data
             try:
                 dag_dict = data if isinstance(data, dict) else {}
                 dag_data = dag_dict.get("dag", dag_dict)
                 tasks = dag_data.get("tasks", [])
                 task_count = len(tasks)
 
-                # Count dependencies from serialized data
+                # Count dependencies — serialized format uses downstream_task_ids
                 dep_count = 0
                 for task in tasks:
-                    dep_count += len(task.get("upstream_task_ids", []))
+                    dep_count += len(task.get("downstream_task_ids", []))
 
                 complexity_data.append(
                     {
@@ -180,7 +182,7 @@ class DAGHealthMonitor:
             if i >= limit:
                 break
             task_count = len(dag.tasks)
-            dependency_count = sum(len(task.upstream_list) for task in dag.tasks)
+            dependency_count = sum(len(task.upstream_list) for task in dag.tasks)  # type: ignore[misc]
             max_depth = self._calculate_dag_depth(dag)
 
             complexity_data.append(
@@ -192,7 +194,7 @@ class DAGHealthMonitor:
                     "avg_dependencies_per_task": round(dependency_count / task_count, 2) if task_count > 0 else 0,
                     "schedule_interval": str(dag.schedule_interval),
                     "is_paused": dag.is_paused,
-                    "tags": [t.name for t in dag.tags] if dag.tags else [],
+                    "tags": [t.name for t in dag.tags] if dag.tags else [],  # type: ignore[attr-defined]
                 }
             )
 
