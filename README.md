@@ -61,6 +61,65 @@ Navigate to **Watcher** in the Airflow UI navigation to access:
 - **Task Health** - Long-running and zombie tasks
 - **Dependencies** - Cross-DAG dependency tracking
 
+## Role-Based Access Control (RBAC)
+
+Airflow Watcher integrates with Airflow's built-in FAB security manager to enforce DAG-level access control. No separate configuration is needed — it reads directly from Airflow's role and permission system.
+
+### How It Works
+
+- **Admin / Op roles** see all DAGs across every Watcher page and API endpoint
+- **Custom roles** only see DAGs they have `can_read` permission on
+- Filtering is mandatory and applied server-side — restricted users cannot bypass it
+- Aggregate stats (failure counts, SLA misses, health scores) are recomputed per-user so no global data leaks
+- A 🔒 badge appears in the filter bar for non-admin users
+
+### Setting Up DAG-Level Permissions
+
+Add `access_control` to your DAG definitions to grant team-specific access:
+
+```python
+from airflow import DAG
+
+dag = DAG(
+    dag_id="weather_data_pipeline",
+    schedule_interval="@hourly",
+    access_control={
+        "team_weather": {"can_read", "can_edit"},
+    },
+)
+```
+
+Then create matching roles in Airflow (Admin → Security → List Roles) and assign users to them. The Watcher plugin will automatically pick up the permissions.
+
+### What Gets Filtered
+
+| Area | Filtering |
+|------|-----------|
+| Dashboard stats | Failure count, SLA misses, health score — all scoped to user's DAGs |
+| Failures page | Only failures from accessible DAGs |
+| SLA page | Only SLA misses from accessible DAGs |
+| Health page | Health status, stale DAGs, scheduling lag — filtered |
+| Task health | Long-running tasks, zombies, retries — filtered |
+| Scheduling | Concurrent runs, delayed DAGs — filtered |
+| Dependencies | Cross-DAG deps, correlations — filtered |
+| All API endpoints | Same RBAC enforcement as UI pages |
+
+### Demo Users
+
+The demo environment includes pre-configured RBAC users:
+
+| User | Password | Role | Visible DAGs |
+|------|----------|------|-------------|
+| `admin` | `admin` | Admin | All 8 DAGs |
+| `weather_user` | `WEATHER_PASS` | team_weather | weather_data_pipeline, stock_market_collector |
+| `ecommerce_user` | `ECOMMERCE_PASS` | team_ecommerce | ecommerce_sales_etl, data_quality_checks |
+
+```bash
+cd demo
+docker-compose up -d
+# Visit http://localhost:8080 and login as any user above
+```
+
 ## Architecture
 
 ```
