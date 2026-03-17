@@ -47,9 +47,9 @@ FORBIDDEN_DAGS = {
 }
 
 USERS = [
-    {"username": "admin", "password": os.environ.get("ADMIN_PASSWORD"), "role": "admin"},
-    {"username": "weather_user", "password": os.environ.get("WEATHER_USER_PASSWORD"), "role": "weather"},
-    {"username": "ecommerce_user", "password": os.environ.get("ECOMMERCE_USER_PASSWORD"), "role": "ecommerce"},
+    {"username": "admin", "password": os.environ["ADMIN_PASSWORD"], "role": "admin"},
+    {"username": "weather_user", "password": os.environ["WEATHER_USER_PASSWORD"], "role": "weather"},
+    {"username": "ecommerce_user", "password": os.environ["ECOMMERCE_USER_PASSWORD"], "role": "ecommerce"},
 ]
 
 WATCHER_PAGES = [

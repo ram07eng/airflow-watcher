@@ -19,9 +19,9 @@ BASE_URL = "http://localhost:8080"
 
 # User pool: 100 users distributed across 3 roles
 USERS = [
-    {"username": "admin", "password": os.environ.get("ADMIN_PASSWORD"), "role": "admin"},
-    {"username": "weather_user", "password": os.environ.get("WEATHER_USER_PASSWORD"), "role": "weather"},
-    {"username": "ecommerce_user", "password": os.environ.get("ECOMMERCE_USER_PASSWORD"), "role": "ecommerce"},
+    {"username": "admin", "password": os.environ["ADMIN_PASSWORD"], "role": "admin"},
+    {"username": "weather_user", "password": os.environ["WEATHER_USER_PASSWORD"], "role": "weather"},
+    {"username": "ecommerce_user", "password": os.environ["ECOMMERCE_USER_PASSWORD"], "role": "ecommerce"},
 ]
 
 # All Watcher endpoints to test
