@@ -4,7 +4,7 @@ An Airflow UI plugin for monitoring DAG failures and SLA misses/delays.
 
 ## Demo
 
-![Airflow Watcher Demo](docs/images/demo_new.gif)
+![Airflow Watcher Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/images/demo_new.gif)
 
 ## Features
 
@@ -120,15 +120,15 @@ Passwords are configured in `demo/docker-compose.yml`. Change them before any sh
 
 **Admin user** — sees all DAGs and full aggregate stats:
 
-![Admin RBAC Demo](docs/images/rbac_admin.gif)
+![Admin RBAC Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/images/rbac_admin.gif)
 
 **Weather team user** — only sees weather_data_pipeline and stock_market_collector:
 
-![Weather User RBAC Demo](docs/images/rbac_weather.gif)
+![Weather User RBAC Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/images/rbac_weather.gif)
 
 **Ecommerce team user** — only sees ecommerce_sales_etl and data_quality_checks:
 
-![Ecommerce User RBAC Demo](docs/images/rbac_ecommerce.gif)
+![Ecommerce User RBAC Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/images/rbac_ecommerce.gif)
 
 ```bash
 cd demo
