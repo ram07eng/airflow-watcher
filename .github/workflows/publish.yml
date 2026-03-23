@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Version bump type"
+        description: "Version bump type (use 'none' to publish current version as-is)"
         required: true
         default: "patch"
         type: choice
@@ -14,6 +14,7 @@ on:
           - patch
           - minor
           - major
+          - none
 
 jobs:
   build:
@@ -34,7 +35,7 @@ jobs:
           python-version: "3.11"
 
       - name: Auto-bump version
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.bump != 'none'
         run: |
           CURRENT=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
@@ -51,8 +52,15 @@ jobs:
           echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
           echo "Bumped: ${CURRENT} → ${NEW_VERSION} (${{ inputs.bump }})"
 
+      - name: Read current version
+        if: github.event_name == 'workflow_dispatch' && inputs.bump == 'none'
+        run: |
+          VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Publishing current version: ${VERSION}"
+
       - name: Commit version bump
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.bump != 'none'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -69,6 +77,15 @@ jobs:
           git push origin :refs/tags/v${VERSION} 2>/dev/null || true
           git tag -f "v${VERSION}"
           git push origin main --tags
+
+      - name: Tag current version
+        if: github.event_name == 'workflow_dispatch' && inputs.bump == 'none'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git push origin :refs/tags/v${VERSION} 2>/dev/null || true
+          git tag -f "v${VERSION}"
+          git push origin --tags
 
       - name: Install build tools
         run: pip install build

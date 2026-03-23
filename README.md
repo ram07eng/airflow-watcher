@@ -220,12 +220,12 @@ See [demo/README.md](demo/README.md) for more details.
 1. Add `airflow-watcher` to your MWAA `requirements.txt`:
 
 ```
-airflow-watcher==0.1.2
+airflow-watcher==1.0.0
 ```
 
 For Prometheus metrics support:
 ```
-airflow-watcher[all]==0.1.2
+airflow-watcher[all]==1.0.0
 ```
 
 2. Upload `requirements.txt` to your MWAA S3 bucket:
@@ -267,7 +267,7 @@ Configure via MWAA Airflow configuration overrides:
 ```bash
 git clone https://github.com/aws/aws-mwaa-local-runner.git
 cd aws-mwaa-local-runner
-echo "airflow-watcher==0.1.2" >> requirements/requirements.txt
+echo "airflow-watcher==1.0.0" >> requirements/requirements.txt
 ./mwaa-local-env build-image
 ./mwaa-local-env start
 ```
