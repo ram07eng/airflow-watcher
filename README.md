@@ -101,7 +101,8 @@ The plugin runs **inside** the Airflow webserver process. Once installed, it aut
 
 ![Airflow Watcher Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/demo_new.gif)
 
-## Plugin Architecture
+<details>
+<summary><h2>Plugin Architecture</h2></summary>
 
 ```
 +--------------------------------------------------------------+
@@ -142,6 +143,8 @@ The plugin runs **inside** the Airflow webserver process. Once installed, it aut
 +--------------------------------------------------------------+
 ```
 
+</details>
+
 ## UI Views
 
 Once installed, navigate to **Watcher** in the Airflow UI navigation to access:
@@ -156,7 +159,8 @@ Once installed, navigate to **Watcher** in the Airflow UI navigation to access:
 | **Task Health** | Long-running and zombie tasks |
 | **Dependencies** | Cross-DAG dependency tracking |
 
-## Plugin RBAC
+<details>
+<summary><h2>Plugin RBAC</h2></summary>
 
 The plugin integrates with Airflow's built-in FAB security manager to enforce DAG-level access control. No separate configuration is needed — it reads directly from Airflow's role and permission system.
 
@@ -199,7 +203,10 @@ Then create matching roles in Airflow (Admin → Security → List Roles) and as
 | Dependencies | Cross-DAG deps, correlations — filtered |
 | All `/api/watcher` endpoints | Same RBAC enforcement as UI pages |
 
-## Plugin API Endpoints — `/api/watcher`
+</details>
+
+<details>
+<summary><h2>Plugin API Endpoints — <code>/api/watcher</code></h2></summary>
 
 The plugin exposes a REST API at `/api/watcher/*` on the Airflow webserver. Authentication uses Airflow's session cookies (same login as the UI). All endpoints return JSON with a standard `{status, data, timestamp}` envelope.
 
@@ -267,7 +274,10 @@ The plugin exposes a REST API at `/api/watcher/*` on the Airflow webserver. Auth
 |--------|------|--------|-------------|
 | GET | `/api/watcher/overview` | — | Combined overview of all monitoring data |
 
-## Demo Environment
+</details>
+
+<details>
+<summary><h2>Demo Environment</h2></summary>
 
 To test the plugin locally with sample DAGs and pre-configured RBAC users:
 
@@ -286,13 +296,16 @@ Then visit http://localhost:8080 and navigate to the **Watcher** menu.
 
 See [demo/README.md](demo/README.md) for more details.
 
+</details>
+
 ---
 
 # Standalone API (FastAPI)
 
 A lightweight, standalone REST API that runs **outside** the Airflow webserver. Use this when you want to call monitoring endpoints from external services, dashboards, or CI/CD pipelines without adding load to the Airflow webserver.
 
-## API Architecture
+<details>
+<summary><h2>API Architecture</h2></summary>
 
 ```
                                  ┌─────────────────┐
@@ -332,6 +345,8 @@ A lightweight, standalone REST API that runs **outside** the Airflow webserver. 
                │  (PostgreSQL / MySQL) │
                └───────────────────────┘
 ```
+
+</details>
 
 ## Quick Start
 
@@ -391,7 +406,8 @@ curl -H "Authorization: Bearer <key>" http://localhost:8081/api/v1/failures/
 | `AIRFLOW_WATCHER_PROMETHEUS_ENABLED` | No | `false` | Enable `/metrics` endpoint |
 | `AIRFLOW_WATCHER_STATSD_ENABLED` | No | `false` | Enable StatsD emission |
 
-## API Endpoints
+<details>
+<summary><h2>API Endpoints</h2></summary>
 
 All endpoints return a standard JSON envelope:
 
@@ -492,7 +508,12 @@ All endpoints return a standard JSON envelope:
 |--------|------|-------------|
 | GET | `/healthz` | Liveness probe: `{status: "ok"/"degraded", uptime_seconds, db_connected}` |
 
-## API RBAC (Role-Based Access Control)
+</details>
+
+<details>
+<summary><h2>API RBAC, Request Flow & Integration Examples</h2></summary>
+
+### API RBAC (Role-Based Access Control)
 
 When `AIRFLOW_WATCHER_RBAC_ENABLED=true`, each API key can only see its mapped DAGs:
 
@@ -510,7 +531,7 @@ export AIRFLOW_WATCHER_API_KEYS="team-a-key,team-b-key,admin-key"
 
 To grant full access, omit the key from the mapping or disable RBAC.
 
-## Request Flow
+### Request Flow
 
 ```
 Client Request
@@ -534,7 +555,7 @@ Client Request
   └─▶ Envelope: wraps in {status, data, timestamp} → HTTP 200
 ```
 
-## Integration Examples
+### Integration Examples
 
 **curl:**
 ```bash
@@ -594,6 +615,8 @@ console.log(`Failures: ${data.failure_stats.failed_runs}`);
 console.log(`Health: ${data.dag_summary.health_score}`);
 ```
 
+</details>
+
 ---
 
 # Common
@@ -612,7 +635,8 @@ console.log(`Health: ${data.dag_summary.health_score}`);
 | **Liveness probe** | `/api/watcher/health` | `/healthz` (no auth) |
 | **Best for** | Airflow operators using the UI | External tools, CI/CD, dashboards |
 
-## Project Structure
+<details>
+<summary><h2>Project Structure</h2></summary>
 
 ```
 airflow-watcher/
@@ -663,7 +687,10 @@ airflow-watcher/
 └── pyproject.toml
 ```
 
-## Testing
+</details>
+
+<details>
+<summary><h2>Testing</h2></summary>
 
 ```bash
 # Unit tests (302 pass)
@@ -683,6 +710,8 @@ python tests/live/test_live_comprehensive.py  # End-to-end integration
 # Skip the pre-existing DB connectivity test
 pytest tests/ -k "not test_logs_error_on_unreachable_db"
 ```
+
+</details>
 
 ## Infrastructure Integration
 
