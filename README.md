@@ -304,26 +304,26 @@ A lightweight, standalone REST API that runs **outside** the Airflow webserver. 
                                           │
                                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Standalone FastAPI Service                    │
-│                    http://localhost:8081                         │
+│                    Standalone FastAPI Service                   │
+│                    http://localhost:8081                        │
 │                                                                 │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌────────────┐  │
-│  │  Auth    │──▶│  RBAC    │──▶│  Cache   │──▶│  Monitors  │  │
-│  │(Bearer)  │   │(dag map) │   │ (TTL 60s)│   │  (6 core)  │  │
-│  └──────────┘   └──────────┘   └──────────┘   └──────┬─────┘  │
-│                                                       │        │
-│  ┌──────────────────────────────────────────────────┐ │        │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌────────────┐    │
+│  │  Auth    │──▶│  RBAC    │──▶│  Cache   │──▶│  Monitors  │    │
+│  │(Bearer)  │   │(dag map) │   │ (TTL 60s)│   │  (6 core)  │    │
+│  └──────────┘   └──────────┘   └──────────┘   └──────┬─────┘    │
+│                                                       │         │
+│  ┌──────────────────────────────────────────────────┐ │         │
 │  │              API Routers (11)                     │ │        │
 │  │  /failures /sla /tasks /scheduling /dags          │◀┘        │
 │  │  /dependencies /overview /health /alerts          │          │
 │  │  /cache /metrics                                  │          │
-│  └──────────────────────────────────────────────────┘          │
+│  └──────────────────────────────────────────────────┘           │
 │                         │                                       │
-│  ┌──────────────┐  ┌────▼──────┐  ┌─────────────────────────┐  │
-│  │  Notifiers   │  │  Envelope │  │  Emitters               │  │
-│  │  Slack/Email │  │  {status, │  │  StatsD / Prometheus    │  │
-│  │  PagerDuty   │  │   data}   │  │  /metrics               │  │
-│  └──────────────┘  └───────────┘  └─────────────────────────┘  │
+│  ┌──────────────┐  ┌────▼──────┐  ┌─────────────────────────┐   │
+│  │  Notifiers   │  │  Envelope │  │  Emitters               │   │
+│  │  Slack/Email │  │  {status, │  │  StatsD / Prometheus    │   │
+│  │  PagerDuty   │  │   data}   │  │  /metrics               │   │
+│  └──────────────┘  └───────────┘  └─────────────────────────┘   │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
                            ▼
