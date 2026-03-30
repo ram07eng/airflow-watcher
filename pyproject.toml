@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "airflow-watcher"
-version = "1.0.0"
+version = "1.1.0"
 description = "Airflow UI Plugin for monitoring DAG failures and SLA misses"
 readme = "README.md"
 license = {text = "Apache-2.0"}
