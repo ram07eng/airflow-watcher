@@ -19,7 +19,9 @@ def invalidate_cache(
     cache = MetricsCache.get_instance()
     cache.clear()
 
-    return success_response({
-        "cleared": True,
-        "message": "All cache entries cleared.",
-    })
+    return success_response(
+        {
+            "cleared": True,
+            "message": "All cache entries cleared.",
+        }
+    )

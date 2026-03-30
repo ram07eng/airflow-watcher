@@ -18,14 +18,12 @@ Tests cover:
 """
 
 import json
-import urllib.request
-import urllib.error
-import urllib.parse
-import base64
+import re
 import sys
 import time
-import re
-import threading
+import urllib.error
+import urllib.parse
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -88,7 +86,9 @@ def pace():
         oldest = _request_timestamps[0]
         wait_time = 61 - (now - oldest)
         if wait_time > 0:
-            print(f"    [PACE] Near rate limit ({len(_request_timestamps)} reqs in window), waiting {wait_time:.0f}s...")
+            print(
+                f"    [PACE] Near rate limit ({len(_request_timestamps)} reqs in window), waiting {wait_time:.0f}s..."
+            )
             time.sleep(wait_time)
             now = time.monotonic()
             cutoff = now - 60
@@ -103,15 +103,18 @@ def pace():
 
 
 # ── HTTP helpers ──────────────────────────────────────────
-def http(method: str, url: str, headers: Optional[Dict] = None,
-         body: Optional[bytes] = None, timeout: int = 15,
-         skip_pace: bool = False,
-         ) -> Tuple[int, Any, Dict[str, str]]:
+def http(
+    method: str,
+    url: str,
+    headers: Optional[Dict] = None,
+    body: Optional[bytes] = None,
+    timeout: int = 15,
+    skip_pace: bool = False,
+) -> Tuple[int, Any, Dict[str, str]]:
     """Return (status, body_parsed, response_headers)."""
     if not skip_pace and "8083" in url and "/healthz" not in url:
         pace()
-    req = urllib.request.Request(url, data=body, method=method,
-                                 headers=headers or {})
+    req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
     try:
         resp = urllib.request.urlopen(req, timeout=timeout)
         resp_headers = {k.lower(): v for k, v in resp.getheaders()}
@@ -166,9 +169,21 @@ API_KEYS = {
 }
 
 WEBSERVERS = [
-    {"name": "admin",     "port": 8080, "user": "admin",           "password": "admin",         "role": "Admin (all DAGs)"},
-    {"name": "weather",   "port": 8081, "user": "weather_user",    "password": "weather123",    "role": "team_weather (2 DAGs)"},
-    {"name": "ecommerce", "port": 8082, "user": "ecommerce_user",  "password": "ecommerce123",  "role": "team_ecommerce (2 DAGs)"},
+    {"name": "admin", "port": 8080, "user": "admin", "password": "admin", "role": "Admin (all DAGs)"},
+    {
+        "name": "weather",
+        "port": 8081,
+        "user": "weather_user",
+        "password": "weather123",
+        "role": "team_weather (2 DAGs)",
+    },
+    {
+        "name": "ecommerce",
+        "port": 8082,
+        "user": "ecommerce_user",
+        "password": "ecommerce123",
+        "role": "team_ecommerce (2 DAGs)",
+    },
 ]
 
 WATCHER_PAGES = [
@@ -217,11 +232,18 @@ STANDALONE_501 = [
 # Known DAG IDs in the demo environment
 WEATHER_DAGS = {"weather_data_pipeline", "stock_market_collector"}
 ECOMMERCE_DAGS = {"ecommerce_sales_etl", "data_quality_checks"}
-ALL_KNOWN_DAGS = WEATHER_DAGS | ECOMMERCE_DAGS | {
-    "ml_training_pipeline", "data_warehouse_refresh",
-    "customer_segmentation", "realtime_anomaly_detector",
-    "log_cleanup_daily", "api_health_monitor",
-}
+ALL_KNOWN_DAGS = (
+    WEATHER_DAGS
+    | ECOMMERCE_DAGS
+    | {
+        "ml_training_pipeline",
+        "data_warehouse_refresh",
+        "customer_segmentation",
+        "realtime_anomaly_detector",
+        "log_cleanup_daily",
+        "api_health_monitor",
+    }
+)
 
 
 # ── Plugin helpers ────────────────────────────────────────
@@ -238,9 +260,13 @@ def get_airflow_session(base_url, user, password):
         if not csrf_match:
             return None, "CSRF token not found"
         csrf_token = csrf_match.group(1)
-        data = urllib.parse.urlencode({
-            "username": user, "password": password, "csrf_token": csrf_token,
-        }).encode()
+        data = urllib.parse.urlencode(
+            {
+                "username": user,
+                "password": password,
+                "csrf_token": csrf_token,
+            }
+        ).encode()
         login_req = urllib.request.Request(login_url, data=data, method="POST")
         login_req.add_header("Content-Type", "application/x-www-form-urlencoded")
         opener.open(login_req, timeout=10)
@@ -278,9 +304,9 @@ def test_plugin():
                 resp = opener.open(req, timeout=15)
                 html = resp.read().decode()
                 has_content = len(html) > 200 and any(
-                    kw in html.lower() for kw in ("watcher", "dashboard", "failure", "health", "scheduling", "sla"))
-                result(resp.status == 200 and has_content, page,
-                       f"size={len(html)}B")
+                    kw in html.lower() for kw in ("watcher", "dashboard", "failure", "health", "scheduling", "sla")
+                )
+                result(resp.status == 200 and has_content, page, f"size={len(html)}B")
             except urllib.error.HTTPError as e:
                 result(False, page, f"HTTP {e.code}", critical=True)
             except Exception as e:
@@ -293,7 +319,7 @@ def test_plugin():
             resp = opener.open(req, timeout=10)
             dags_data = json.loads(resp.read().decode())
             dag_ids = sorted(d["dag_id"] for d in dags_data.get("dags", []))
-            result(True, f"DAG visibility", f"{len(dag_ids)} DAGs: {dag_ids}")
+            result(True, "DAG visibility", f"{len(dag_ids)} DAGs: {dag_ids}")
         except Exception as e:
             skip("DAG visibility", str(e)[:80])
 
@@ -309,7 +335,11 @@ def test_api_endpoints():
     if status == 0:
         skip("Standalone API", f"not reachable: {body}")
         return
-    result(status == 200, "/healthz (no auth)", f"db_connected={body.get('db_connected') if isinstance(body, dict) else '?'}")
+    result(
+        status == 200,
+        "/healthz (no auth)",
+        f"db_connected={body.get('db_connected') if isinstance(body, dict) else '?'}",
+    )
 
     for role, info in API_KEYS.items():
         hdr = bearer(info["key"])
@@ -331,7 +361,7 @@ def test_api_endpoints():
                     ok = False
                     detail += ", ENVELOPE BROKEN"
                 else:
-                    detail += f", envelope=ok"
+                    detail += ", envelope=ok"
             result(ok, f"GET {path}", detail, critical=not ok)
 
         # 501 endpoints
@@ -358,11 +388,8 @@ def test_envelope_and_schema():
         if not isinstance(body, dict):
             result(False, f"Schema {path}", "not a dict", critical=True)
             continue
-        ok = (body.get("status") == "success"
-              and "timestamp" in body
-              and "data" in body)
-        result(ok, f"Envelope {path}",
-               f"keys={sorted(body.keys())}")
+        ok = body.get("status") == "success" and "timestamp" in body and "data" in body
+        result(ok, f"Envelope {path}", f"keys={sorted(body.keys())}")
 
         ts = body.get("timestamp", "")
         valid_ts = bool(re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", ts))
@@ -374,11 +401,13 @@ def test_envelope_and_schema():
     if isinstance(body, dict):
         detail = body.get("detail", {})
         if isinstance(detail, dict):
-            result(detail.get("status") == "error", "401 envelope: status=error",
-                   f"got {detail.get('status')}")
+            result(detail.get("status") == "error", "401 envelope: status=error", f"got {detail.get('status')}")
         elif isinstance(detail, str):
-            result("error" in detail.lower() or "auth" in detail.lower(),
-                   "401 envelope: error detail", f"detail={detail[:60]}")
+            result(
+                "error" in detail.lower() or "auth" in detail.lower(),
+                "401 envelope: error detail",
+                f"detail={detail[:60]}",
+            )
 
     # Error envelope for 404
     code, body, hdrs = http("GET", f"{API_BASE}/api/v1/nonexistent", headers=hdr)
@@ -387,8 +416,7 @@ def test_envelope_and_schema():
     # X-API-Version header
     code, body, hdrs = http("GET", f"{API_BASE}/api/v1/health/", headers=hdr)
     api_version = hdrs.get("x-api-version", "")
-    result(api_version == "1.0", "X-API-Version header = 1.0",
-           f"got '{api_version}'")
+    result(api_version == "1.0", "X-API-Version header = 1.0", f"got '{api_version}'")
 
 
 # ══════════════════════════════════════════════════════════
@@ -460,13 +488,14 @@ def test_rbac_deep():
             result(
                 len(leaked) == 0,
                 f"RBAC-scan {role} {path}",
-                f"visible={sorted(found_dags)}, leaked={sorted(leaked)}" if leaked
+                f"visible={sorted(found_dags)}, leaked={sorted(leaked)}"
+                if leaked
                 else f"visible={sorted(found_dags)} ✓",
                 critical=len(leaked) > 0,
             )
 
     # Admin should see more DAGs than restricted keys
-    print(f"\n  ─── ADMIN vs SCOPED comparison ───")
+    print("\n  ─── ADMIN vs SCOPED comparison ───")
     admin_hdr = bearer(API_KEYS["admin"]["key"])
     weather_hdr = bearer(API_KEYS["weather"]["key"])
 
@@ -481,16 +510,17 @@ def test_rbac_deep():
         _extract_dag_ids_recursive(weather_body.get("data", {}), weather_dags)
 
         if len(admin_dags) >= len(weather_dags):
-            result(True, f"Admin ≥ weather DAGs on {path}",
-                   f"admin={len(admin_dags)}, weather={len(weather_dags)}")
+            result(True, f"Admin ≥ weather DAGs on {path}", f"admin={len(admin_dags)}, weather={len(weather_dags)}")
         else:
             # Admin response may have 0 DAG IDs in aggregate fields while
             # weather response has per-DAG detail — data-dependent, not a leak
-            warn(f"Admin < weather extracted DAGs on {path}",
-                 f"admin={len(admin_dags)}, weather={len(weather_dags)} (aggregate vs detail)")
+            warn(
+                f"Admin < weather extracted DAGs on {path}",
+                f"admin={len(admin_dags)}, weather={len(weather_dags)} (aggregate vs detail)",
+            )
 
     # Single-DAG health: verify 403 on unauthorized DAGs
-    print(f"\n  ─── Single-DAG health RBAC ───")
+    print("\n  ─── Single-DAG health RBAC ───")
     for role in ("weather", "ecommerce"):
         info = API_KEYS[role]
         hdr = bearer(info["key"])
@@ -500,17 +530,15 @@ def test_rbac_deep():
         forbidden = ALL_KNOWN_DAGS - expected
         for dag_id in sorted(forbidden)[:3]:  # Test up to 3 forbidden
             code, _ = http_get(f"{API_BASE}/api/v1/health/{dag_id}", headers=hdr)
-            result(code == 403, f"RBAC: {role} blocked from /health/{dag_id}",
-                   f"got {code}", critical=code != 403)
+            result(code == 403, f"RBAC: {role} blocked from /health/{dag_id}", f"got {code}", critical=code != 403)
 
         # Allowed DAGs
         for dag_id in sorted(expected):
             code, _ = http_get(f"{API_BASE}/api/v1/health/{dag_id}", headers=hdr)
-            result(code == 200, f"RBAC: {role} allowed /health/{dag_id}",
-                   f"got {code}")
+            result(code == 200, f"RBAC: {role} allowed /health/{dag_id}", f"got {code}")
 
     # Failures with explicit dag_id filter — verify RBAC blocks
-    print(f"\n  ─── Failures dag_id filter RBAC ───")
+    print("\n  ─── Failures dag_id filter RBAC ───")
     for role in ("weather", "ecommerce"):
         info = API_KEYS[role]
         hdr = bearer(info["key"])
@@ -521,8 +549,7 @@ def test_rbac_deep():
             headers=hdr,
         )
         # Should return 403 because dag_id is checked
-        result(code == 403, f"RBAC: {role} failures?dag_id={forbidden_dag} → 403",
-               f"got {code}", critical=code != 403)
+        result(code == 403, f"RBAC: {role} failures?dag_id={forbidden_dag} → 403", f"got {code}", critical=code != 403)
 
 
 # ══════════════════════════════════════════════════════════
@@ -535,12 +562,20 @@ def test_query_boundaries():
 
     # hours param: min=1, max=8760
     test_cases = [
-        ("/api/v1/failures/", "hours", [("1", 200), ("8760", 200), ("0", 422), ("-1", 422), ("8761", 422), ("abc", 422)]),
+        (
+            "/api/v1/failures/",
+            "hours",
+            [("1", 200), ("8760", 200), ("0", 422), ("-1", 422), ("8761", 422), ("abc", 422)],
+        ),
         ("/api/v1/failures/", "limit", [("1", 200), ("500", 200), ("0", 422), ("501", 422), ("-1", 422)]),
         ("/api/v1/tasks/long-running", "threshold_minutes", [("1", 200), ("10080", 200), ("0", 422), ("10081", 422)]),
         ("/api/v1/tasks/retries", "min_retries", [("1", 200), ("100", 200), ("0", 422), ("101", 422)]),
         ("/api/v1/dags/inactive", "days", [("1", 200), ("365", 200), ("0", 422), ("366", 422)]),
-        ("/api/v1/scheduling/stale-dags", "expected_interval_hours", [("1", 200), ("720", 200), ("0", 422), ("721", 422)]),
+        (
+            "/api/v1/scheduling/stale-dags",
+            "expected_interval_hours",
+            [("1", 200), ("720", 200), ("0", 422), ("721", 422)],
+        ),
         ("/api/v1/scheduling/lag", "threshold_minutes", [("1", 200), ("10080", 200), ("0", 422), ("10081", 422)]),
     ]
 
@@ -549,8 +584,7 @@ def test_query_boundaries():
             url = f"{API_BASE}{base_ep}?{param}={val}"
             code, body = http_get(url, headers=hdr)
             ok = code == expected_code
-            result(ok, f"{base_ep} {param}={val} → {expected_code}",
-                   f"got {code}")
+            result(ok, f"{base_ep} {param}={val} → {expected_code}", f"got {code}")
 
     # Empty string for optional dag_id should work
     code, _ = http_get(f"{API_BASE}/api/v1/failures/?dag_id=&hours=24", headers=hdr)
@@ -559,7 +593,7 @@ def test_query_boundaries():
     # Very long dag_id (should not crash the server)
     long_dag = "a" * 300
     code, _ = http_get(f"{API_BASE}/api/v1/health/{long_dag}", headers=hdr)
-    result(code in (200, 400, 403, 404, 422), f"health/{'a'*10}... (300 chars)", f"got {code}")
+    result(code in (200, 400, 403, 404, 422), f"health/{'a' * 10}... (300 chars)", f"got {code}")
 
 
 # ══════════════════════════════════════════════════════════
@@ -578,15 +612,30 @@ def test_auth_security():
     result(*_expect_code("Invalid token", test_ep, {"Authorization": "Bearer AAAA"}, 401))
     result(*_expect_code("Basic scheme", test_ep, {"Authorization": "Basic YWRtaW46YWRtaW4="}, 401))
     result(*_expect_code("Digest scheme", test_ep, {"Authorization": "Digest realm=test"}, 401))
-    result(*_expect_code("Token prefix case", test_ep, {"Authorization": "bearer " + API_KEYS["admin"]["key"]}, 401))  # lowercase bearer
+    result(
+        *_expect_code("Token prefix case", test_ep, {"Authorization": "bearer " + API_KEYS["admin"]["key"]}, 401)
+    )  # lowercase bearer
     result(*_expect_code("Double Bearer", test_ep, {"Authorization": "Bearer Bearer " + API_KEYS["admin"]["key"]}, 401))
-    result(*_expect_code("Trailing spaces in token", test_ep, {"Authorization": "Bearer " + API_KEYS["admin"]["key"] + "  "}, 200))  # Token .strip() normalises whitespace
-    result(*_expect_code("Leading space in token", test_ep, {"Authorization": "Bearer  " + API_KEYS["admin"]["key"]}, 200))  # Token .strip() normalises whitespace
-    result(*_expect_code("Token with newline", test_ep, {"Authorization": "Bearer " + API_KEYS["admin"]["key"] + "\n"}, (401, 0)))  # 0=conn error is OK
+    result(
+        *_expect_code(
+            "Trailing spaces in token", test_ep, {"Authorization": "Bearer " + API_KEYS["admin"]["key"] + "  "}, 200
+        )
+    )  # Token .strip() normalises whitespace
+    result(
+        *_expect_code("Leading space in token", test_ep, {"Authorization": "Bearer  " + API_KEYS["admin"]["key"]}, 200)
+    )  # Token .strip() normalises whitespace
+    result(
+        *_expect_code(
+            "Token with newline", test_ep, {"Authorization": "Bearer " + API_KEYS["admin"]["key"] + "\n"}, (401, 0)
+        )
+    )  # 0=conn error is OK
 
     # Revoked / old token
-    result(*_expect_code("Old/revoked token", test_ep,
-                         {"Authorization": "Bearer v8LEah9G93MOoPJn7WUUm8vYp6jEsnFmC_FOpMX1ctU"}, 401))
+    result(
+        *_expect_code(
+            "Old/revoked token", test_ep, {"Authorization": "Bearer v8LEah9G93MOoPJn7WUUm8vYp6jEsnFmC_FOpMX1ctU"}, 401
+        )
+    )
 
     # Valid tokens
     for role, info in API_KEYS.items():
@@ -606,14 +655,12 @@ def test_auth_security():
         encoded = urllib.parse.quote(payload)
         code, body = http_get(f"{API_BASE}/api/v1/failures/?dag_id={encoded}&hours=24", headers=hdr)
         # Should return 200 (with empty results or filtered) or 403/422, never 500
-        result(code != 500, f"SQLi: dag_id={payload[:40]}",
-               f"got {code}", critical=code == 500)
+        result(code != 500, f"SQLi: dag_id={payload[:40]}", f"got {code}", critical=code == 500)
 
     for payload in sqli_payloads:
         encoded = urllib.parse.quote(payload)
         code, body = http_get(f"{API_BASE}/api/v1/health/{encoded}", headers=hdr)
-        result(code != 500, f"SQLi: health/{payload[:40]}",
-               f"got {code}", critical=code == 500)
+        result(code != 500, f"SQLi: health/{payload[:40]}", f"got {code}", critical=code == 500)
 
     # ── Path traversal ──
     print("\n  ─── Path traversal ───")
@@ -629,20 +676,18 @@ def test_auth_security():
         else:
             body_str = str(body)
         no_leak = "root:" not in body_str and "/bin/bash" not in body_str
-        result(no_leak and code != 500, f"Path traversal: {payload[:50]}",
-               f"status={code}", critical=not no_leak)
+        result(no_leak and code != 500, f"Path traversal: {payload[:50]}", f"status={code}", critical=not no_leak)
 
     # ── Header injection ──
     print("\n  ─── Header injection ───")
-    code, body, hdrs = http("GET", f"{API_BASE}/api/v1/health/",
-                            headers={**hdr, "X-Forwarded-For": "127.0.0.1\r\nX-Injected: evil"})
+    code, body, hdrs = http(
+        "GET", f"{API_BASE}/api/v1/health/", headers={**hdr, "X-Forwarded-For": "127.0.0.1\r\nX-Injected: evil"}
+    )
     result(code != 500, "Header injection X-Forwarded-For", f"status={code}")
 
     # ── CORS check (no CORS should be enabled by default) ──
     print("\n  ─── CORS ───")
-    code, body, hdrs = http("GET", f"{API_BASE}/api/v1/health/", headers={
-        **hdr, "Origin": "https://evil.com"
-    })
+    code, body, hdrs = http("GET", f"{API_BASE}/api/v1/health/", headers={**hdr, "Origin": "https://evil.com"})
     has_acao = "access-control-allow-origin" in hdrs
     if has_acao:
         warn("CORS enabled", f"ACAO={hdrs.get('access-control-allow-origin')}")
@@ -685,8 +730,11 @@ def test_auth_security():
     avg_near = sum(near_times) / n_samples
     avg_total = sum(total_times) / n_samples
     ratio = max(avg_near, avg_total) / max(min(avg_near, avg_total), 0.0001)
-    result(ratio < 3.0, "Timing attack: near-miss vs total-miss",
-           f"near={avg_near*1000:.1f}ms, total={avg_total*1000:.1f}ms, ratio={ratio:.2f}")
+    result(
+        ratio < 3.0,
+        "Timing attack: near-miss vs total-miss",
+        f"near={avg_near * 1000:.1f}ms, total={avg_total * 1000:.1f}ms, ratio={ratio:.2f}",
+    )
 
 
 def _expect_code(label, url, headers, expected):
@@ -719,8 +767,7 @@ def test_rate_limiting():
     got_429 = False
     retry_after = None
     for i in range(130):
-        code, body, hdrs = http("GET", f"{API_BASE}/api/v1/health/",
-                                headers=hdr, timeout=5, skip_pace=True)
+        code, body, hdrs = http("GET", f"{API_BASE}/api/v1/health/", headers=hdr, timeout=5, skip_pace=True)
         codes.append(code)
         if code == 429:
             got_429 = True
@@ -728,21 +775,20 @@ def test_rate_limiting():
             break
 
     if got_429:
-        result(True, f"Rate limit triggered at request #{len(codes)}",
-               f"429 after {len(codes)} requests")
-        result(retry_after != "missing", "Retry-After header present",
-               f"value={retry_after}")
+        result(True, f"Rate limit triggered at request #{len(codes)}", f"429 after {len(codes)} requests")
+        result(retry_after != "missing", "Retry-After header present", f"value={retry_after}")
     else:
-        warn("Rate limit NOT triggered in 130 requests",
-             f"all codes: {set(codes)}, may be > 120/min configured or test ran too slowly")
+        warn(
+            "Rate limit NOT triggered in 130 requests",
+            f"all codes: {set(codes)}, may be > 120/min configured or test ran too slowly",
+        )
 
     # After getting 429, wait and try again
     if got_429:
         time.sleep(2)
         code, _ = http_get(f"{API_BASE}/api/v1/health/", headers=hdr)
         # May still be throttled depending on window
-        result(code in (200, 429), "Request after rate limit cooldown",
-               f"status={code}")
+        result(code in (200, 429), "Request after rate limit cooldown", f"status={code}")
 
 
 # ══════════════════════════════════════════════════════════
@@ -791,20 +837,20 @@ def test_concurrency():
                 results_map[path] = []
             results_map[path].append(code)
 
-    all_ok = True
     for path, codes in results_map.items():
-        success_count = sum(1 for c in codes if c in (200, 429, 503))  # 429 OK if rate limited, 503 OK for degraded health
+        success_count = sum(
+            1 for c in codes if c in (200, 429, 503)
+        )  # 429 OK if rate limited, 503 OK for degraded health
         ok = success_count == len(codes)
         if not ok:
-            all_ok = False
+            pass
         result(ok, f"Concurrent {path}", f"codes={codes}")
 
     # Verify no data corruption: same endpoint should return same data
     print("\n  ─── Consistency across concurrent reads ───")
     responses = []
     with ThreadPoolExecutor(max_workers=5) as pool:
-        futures = [pool.submit(make_request, f"{API_BASE}/api/v1/dags/status-summary")
-                   for _ in range(5)]
+        futures = [pool.submit(make_request, f"{API_BASE}/api/v1/dags/status-summary") for _ in range(5)]
         for f in as_completed(futures):
             _, code, body = f.result()
             if code == 200 and isinstance(body, dict):
@@ -814,8 +860,7 @@ def test_concurrency():
         # All responses should have same total_dags
         totals = [r.get("total_dags") for r in responses if "total_dags" in r]
         unique_totals = set(totals)
-        result(len(unique_totals) <= 1, "Concurrent reads return consistent data",
-               f"total_dags values: {totals}")
+        result(len(unique_totals) <= 1, "Concurrent reads return consistent data", f"total_dags values: {totals}")
     else:
         skip("Concurrent consistency", f"only {len(responses)} valid responses")
 
@@ -840,8 +885,7 @@ def test_caching():
     result(code == 200, "POST /cache/invalidate → 200", f"body={body}")
     if isinstance(body, dict):
         data = body.get("data", {})
-        result(data.get("cleared") is True, "Cache cleared=true in response",
-               f"data={data}")
+        result(data.get("cleared") is True, "Cache cleared=true in response", f"data={data}")
 
     # After invalidation, next request should still work (re-populates cache)
     code, body = http_get(f"{API_BASE}/api/v1/health/", headers=hdr)
@@ -854,8 +898,7 @@ def test_caching():
         # Timestamps may differ slightly but data should be identical
         d1 = body1.get("data")
         d2 = body2.get("data")
-        result(d1 == d2, "Rapid requests return cached data",
-               f"data identical={d1 == d2}")
+        result(d1 == d2, "Rapid requests return cached data", f"data identical={d1 == d2}")
     else:
         skip("Cache freshness check", f"codes {code1}, {code2}")
 
@@ -900,8 +943,7 @@ def test_data_consistency():
             )
         else:
             # complexity only returns DAGs exceeding threshold — empty is normal
-            result(True, "Complexity endpoint returns 0 complex DAGs (expected)",
-                   f"count={len(api_dags)}")
+            result(True, "Complexity endpoint returns 0 complex DAGs (expected)", f"count={len(api_dags)}")
     else:
         skip("API DAG IDs", f"complexity returned {code}")
 
@@ -940,13 +982,13 @@ def test_data_consistency():
         health_score = health_data.get("data", {}).get("health_score")
         status_val = health_data.get("data", {}).get("status")
         if code == 200:
-            result(status_val == "healthy" and (health_score is None or health_score >= 70),
-                   "Health: 200 → healthy with score ≥ 70",
-                   f"status={status_val}, score={health_score}")
+            result(
+                status_val == "healthy" and (health_score is None or health_score >= 70),
+                "Health: 200 → healthy with score ≥ 70",
+                f"status={status_val}, score={health_score}",
+            )
         else:
-            result(status_val == "degraded",
-                   "Health: 503 → degraded",
-                   f"status={status_val}, score={health_score}")
+            result(status_val == "degraded", "Health: 503 → degraded", f"status={status_val}, score={health_score}")
 
 
 # ══════════════════════════════════════════════════════════
@@ -987,8 +1029,7 @@ def test_error_handling():
     # Very long URL
     long_url = f"{API_BASE}/api/v1/failures/?dag_id={'x' * 2000}&hours=24"
     code, _ = http_get(long_url, headers=hdr)
-    result(code in (200, 400, 403, 414, 422), "Very long URL (2000 char dag_id)",
-           f"got {code}")
+    result(code in (200, 400, 403, 414, 422), "Very long URL (2000 char dag_id)", f"got {code}")
 
     # POST with unexpected body to evaluate endpoint
     code, body, _ = http_post(
@@ -996,17 +1037,15 @@ def test_error_handling():
         headers={**hdr, "Content-Type": "application/json"},
         body=b'{"unexpected": "payload"}',
     )
-    result(code in (200, 422), "POST /alerts/evaluate with unexpected body",
-           f"got {code}")
+    result(code in (200, 422), "POST /alerts/evaluate with unexpected body", f"got {code}")
 
     # POST with invalid JSON body
     code, body, _ = http_post(
         f"{API_BASE}/api/v1/alerts/evaluate",
         headers={**hdr, "Content-Type": "application/json"},
-        body=b'not json at all {{{',
+        body=b"not json at all {{{",
     )
-    result(code in (200, 400, 422), "POST with malformed JSON",
-           f"got {code}")
+    result(code in (200, 400, 422), "POST with malformed JSON", f"got {code}")
 
     # ── Special characters in DAG ID ──
     print("\n  ─── Special characters in DAG ID ───")
@@ -1021,21 +1060,18 @@ def test_error_handling():
     for dag_id in special_dags:
         encoded = urllib.parse.quote(dag_id, safe="")
         code, _ = http_get(f"{API_BASE}/api/v1/health/{encoded}", headers=hdr)
-        result(code != 500, f"health/{dag_id[:30]}",
-               f"got {code}", critical=code == 500)
+        result(code != 500, f"health/{dag_id[:30]}", f"got {code}", critical=code == 500)
 
     # ── Content-Type check ──
     print("\n  ─── Content-Type headers ───")
     code, body, hdrs = http("GET", f"{API_BASE}/api/v1/health/", headers=hdr)
     ct = hdrs.get("content-type", "")
-    result("application/json" in ct, "Response Content-Type is JSON",
-           f"got '{ct}'")
+    result("application/json" in ct, "Response Content-Type is JSON", f"got '{ct}'")
 
     # Healthz Content-Type
     code, body, hdrs = http("GET", f"{API_BASE}/healthz")
     ct = hdrs.get("content-type", "")
-    result("application/json" in ct, "/healthz Content-Type is JSON",
-           f"got '{ct}'")
+    result("application/json" in ct, "/healthz Content-Type is JSON", f"got '{ct}'")
 
 
 # ══════════════════════════════════════════════════════════
@@ -1052,9 +1088,11 @@ def test_post_endpoints():
     result(code == 200, "POST alerts/evaluate → 200", f"status={code}")
     if code == 200 and isinstance(body, dict):
         data = body.get("data", {})
-        result("evaluated_rules" in data or "results" in data,
-               "alerts/evaluate has expected fields",
-               f"keys={sorted(data.keys()) if isinstance(data, dict) else 'not dict'}")
+        result(
+            "evaluated_rules" in data or "results" in data,
+            "alerts/evaluate has expected fields",
+            f"keys={sorted(data.keys()) if isinstance(data, dict) else 'not dict'}",
+        )
 
     # cache/invalidate — should work
     print("\n  ─── POST /api/v1/cache/invalidate ───")
@@ -1099,27 +1137,23 @@ def test_overview_deep():
     expected_keys = {"failure_stats", "sla_stats", "dag_summary"}
     present_keys = set(data.keys())
     for key in expected_keys:
-        result(key in present_keys, f"Overview has '{key}'",
-               f"present={key in present_keys}")
+        result(key in present_keys, f"Overview has '{key}'", f"present={key in present_keys}")
 
     # Numerical fields should be non-negative
     for key in ("long_running_tasks", "zombie_count", "import_errors"):
         if key in data:
             val = data[key]
-            result(isinstance(val, (int, float)) and val >= 0,
-                   f"Overview {key} ≥ 0", f"value={val}")
+            result(isinstance(val, (int, float)) and val >= 0, f"Overview {key} ≥ 0", f"value={val}")
 
     # dag_summary should have total_dags
     dag_summary = data.get("dag_summary", {})
     if isinstance(dag_summary, dict):
         total = dag_summary.get("total_dags")
-        result(isinstance(total, int) and total >= 0,
-               "dag_summary.total_dags is non-negative int", f"value={total}")
+        result(isinstance(total, int) and total >= 0, "dag_summary.total_dags is non-negative int", f"value={total}")
 
         health_score = dag_summary.get("health_score")
         if health_score is not None:
-            result(0 <= health_score <= 100,
-                   "dag_summary.health_score in [0,100]", f"value={health_score}")
+            result(0 <= health_score <= 100, "dag_summary.health_score in [0,100]", f"value={health_score}")
 
     # Compare overview's failure_stats with standalone /failures/stats
     code2, stats_body = http_get(f"{API_BASE}/api/v1/failures/stats?hours=24", headers=admin_hdr)
@@ -1129,8 +1163,11 @@ def test_overview_deep():
         # Both should have total_failures (may differ slightly due to cache timing)
         if "total_failures" in ov_failures and "total_failures" in st_failures:
             diff = abs(ov_failures["total_failures"] - st_failures["total_failures"])
-            result(diff <= 5, "Overview failure count ≈ /failures/stats",
-                   f"overview={ov_failures['total_failures']}, stats={st_failures['total_failures']}, diff={diff}")
+            result(
+                diff <= 5,
+                "Overview failure count ≈ /failures/stats",
+                f"overview={ov_failures['total_failures']}, stats={st_failures['total_failures']}, diff={diff}",
+            )
 
 
 # ══════════════════════════════════════════════════════════
@@ -1154,10 +1191,12 @@ def test_rbac_post_endpoints():
             _extract_dag_ids_recursive(data, found_dags)
             if found_dags:
                 leaked = found_dags - expected
-                result(len(leaked) == 0,
-                       f"RBAC: {role} alerts/evaluate no leak",
-                       f"dags={sorted(found_dags)}, leaked={sorted(leaked)}",
-                       critical=len(leaked) > 0)
+                result(
+                    len(leaked) == 0,
+                    f"RBAC: {role} alerts/evaluate no leak",
+                    f"dags={sorted(found_dags)}, leaked={sorted(leaked)}",
+                    critical=len(leaked) > 0,
+                )
             else:
                 result(True, f"RBAC: {role} alerts/evaluate (no DAGs in response)", "")
 
@@ -1177,17 +1216,18 @@ def test_healthz_deep():
             result(field in body, f"/healthz has '{field}'", f"keys={sorted(body.keys())}")
 
         # status should be "ok" or "degraded"
-        result(body.get("status") in ("ok", "degraded"),
-               "/healthz status is ok|degraded", f"got {body.get('status')}")
+        result(body.get("status") in ("ok", "degraded"), "/healthz status is ok|degraded", f"got {body.get('status')}")
 
         # uptime should be positive
         uptime = body.get("uptime_seconds", -1)
-        result(isinstance(uptime, (int, float)) and uptime > 0,
-               "/healthz uptime > 0", f"got {uptime}")
+        result(isinstance(uptime, (int, float)) and uptime > 0, "/healthz uptime > 0", f"got {uptime}")
 
         # db_connected should be boolean
-        result(isinstance(body.get("db_connected"), bool),
-               "/healthz db_connected is bool", f"got {type(body.get('db_connected'))}")
+        result(
+            isinstance(body.get("db_connected"), bool),
+            "/healthz db_connected is bool",
+            f"got {type(body.get('db_connected'))}",
+        )
 
     # /healthz must NOT require auth
     code2, _ = http_get(f"{API_BASE}/healthz")
@@ -1207,24 +1247,24 @@ if __name__ == "__main__":
     print("\n" + "#" * 76)
     print("#  AIRFLOW WATCHER — DEEP QA TEST SUITE")
     print(f"#  Date: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"#  Target: Plugin (8080-8082) + API (8083)")
+    print("#  Target: Plugin (8080-8082) + API (8083)")
     print("#" * 76)
 
-    test_plugin()                  # Section 1
-    test_api_endpoints()           # Section 2
-    test_envelope_and_schema()     # Section 3
-    test_rbac_deep()               # Section 4
-    test_query_boundaries()        # Section 5
-    test_auth_security()           # Section 6
-    test_concurrency()             # Section 7 (was 8)
-    test_caching()                 # Section 8 (was 9)
-    test_data_consistency()        # Section 9 (was 10)
-    test_error_handling()          # Section 10 (was 11)
-    test_post_endpoints()          # Section 11 (was 12)
-    test_overview_deep()           # Section 12 (was 13)
-    test_rbac_post_endpoints()     # Section 13 (was 14)
-    test_healthz_deep()            # Section 14 (was 15)
-    test_rate_limiting()           # Section 15 — LAST (triggers 429 flood)
+    test_plugin()  # Section 1
+    test_api_endpoints()  # Section 2
+    test_envelope_and_schema()  # Section 3
+    test_rbac_deep()  # Section 4
+    test_query_boundaries()  # Section 5
+    test_auth_security()  # Section 6
+    test_concurrency()  # Section 7 (was 8)
+    test_caching()  # Section 8 (was 9)
+    test_data_consistency()  # Section 9 (was 10)
+    test_error_handling()  # Section 10 (was 11)
+    test_post_endpoints()  # Section 11 (was 12)
+    test_overview_deep()  # Section 12 (was 13)
+    test_rbac_post_endpoints()  # Section 13 (was 14)
+    test_healthz_deep()  # Section 14 (was 15)
+    test_rate_limiting()  # Section 15 — LAST (triggers 429 flood)
 
     elapsed = time.time() - start
 

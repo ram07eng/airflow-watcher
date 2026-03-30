@@ -19,10 +19,10 @@ import json
 import re
 import sys
 import time
-import urllib.request
 import urllib.error
 import urllib.parse
-from typing import Any, Dict, List, Optional, Tuple
+import urllib.request
+from typing import Any, Dict, List, Tuple
 
 # ── Counters ──────────────────────────────────────────────
 PASS = 0
@@ -100,9 +100,13 @@ def get_airflow_session(base_url, user, password):
         if not csrf_match:
             return None, "CSRF token not found"
         csrf_token = csrf_match.group(1)
-        data = urllib.parse.urlencode({
-            "username": user, "password": password, "csrf_token": csrf_token,
-        }).encode()
+        data = urllib.parse.urlencode(
+            {
+                "username": user,
+                "password": password,
+                "csrf_token": csrf_token,
+            }
+        ).encode()
         login_req = urllib.request.Request(login_url, data=data, method="POST")
         login_req.add_header("Content-Type", "application/x-www-form-urlencoded")
         opener.open(login_req, timeout=10)
@@ -116,8 +120,8 @@ ADMIN_BASE = "http://localhost:8080"
 STANDALONE_BASE = "http://localhost:8083"
 
 WEBSERVERS = [
-    {"name": "admin",     "port": 8080, "user": "admin",          "password": "admin",        "role": "Admin"},
-    {"name": "weather",   "port": 8081, "user": "weather_user",   "password": "weather123",   "role": "team_weather"},
+    {"name": "admin", "port": 8080, "user": "admin", "password": "admin", "role": "Admin"},
+    {"name": "weather", "port": 8081, "user": "weather_user", "password": "weather123", "role": "team_weather"},
     {"name": "ecommerce", "port": 8082, "user": "ecommerce_user", "password": "ecommerce123", "role": "team_ecommerce"},
 ]
 
@@ -362,7 +366,7 @@ def test_plugin_security(opener, base_url, label):
         result(is_safe and code in (200, 403, 404), f"Path traversal: {payload[:35]}", f"status={code}")
 
     # XSS in dag_id (should be JSON response, not reflected HTML)
-    xss = '<script>alert(1)</script>'
+    xss = "<script>alert(1)</script>"
     url = f"{base_url}/api/watcher/health/{urllib.parse.quote(xss)}"
     code, body = plugin_get(opener, url)
     body_str = json.dumps(body) if isinstance(body, dict) else str(body)
@@ -376,7 +380,7 @@ def test_plugin_security(opener, base_url, label):
     code, body = plugin_get(opener, f"{base_url}/api/watcher/health")
     if code in (200, 503) and isinstance(body, dict):
         body_str = json.dumps(body)
-        no_leak = "Traceback" not in body_str and "File \"/" not in body_str
+        no_leak = "Traceback" not in body_str and 'File "/' not in body_str
         result(no_leak, "No stack trace in health response", f"status={code}")
 
 
@@ -486,7 +490,7 @@ if __name__ == "__main__":
     print("\n" + "#" * 76)
     print("#  AIRFLOW WATCHER — PLUGIN API DEEP QA TEST")
     print(f"#  Date: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"#  Targets: Airflow webservers (8080-8082) → /api/watcher/*")
+    print("#  Targets: Airflow webservers (8080-8082) → /api/watcher/*")
     print("#" * 76)
 
     # Login to all webservers
@@ -507,7 +511,7 @@ if __name__ == "__main__":
     if not any_reachable:
         print("\n  ❌ No Airflow webservers reachable. Are the demo containers running?")
         print("     Run:  cd demo && docker compose up -d")
-        print(f"\n  RESULTS: 0 passed, 0 failed, 0 skipped")
+        print("\n  RESULTS: 0 passed, 0 failed, 0 skipped")
         sys.exit(1)
 
     admin_sess = sessions.get("admin")
@@ -556,7 +560,7 @@ if __name__ == "__main__":
             print(f"    • {w}")
 
     if FAIL == 0:
-        print(f"\n  ✅ ALL TESTS PASSED — No bugs found!")
+        print("\n  ✅ ALL TESTS PASSED — No bugs found!")
     else:
         print(f"\n  ❌ {FAIL} TEST(S) FAILED — See bugs above.")
 

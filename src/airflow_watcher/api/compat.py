@@ -12,11 +12,9 @@ actual database tables via ``map_imperatively``.  This avoids fragile
 
 import logging
 import sys
-from datetime import datetime, timezone as _tz
+from datetime import datetime
+from datetime import timezone as _tz
 from types import ModuleType
-
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text
-from sqlalchemy.orm import DeclarativeBase
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +45,7 @@ def install_airflow_stubs():
     """Install minimal stubs into sys.modules if Airflow is not installed."""
     try:
         import airflow  # noqa: F401
+
         return  # Airflow is available, nothing to do
     except ImportError:
         pass
@@ -106,6 +105,7 @@ def install_airflow_stubs():
         def wrapper(*args, **kwargs):
             if kwargs.get("session") is None:
                 from airflow_watcher.api.db import get_session_factory
+
                 factory = get_session_factory()
                 if factory is not None:
                     session = factory()
@@ -141,6 +141,7 @@ def install_airflow_stubs():
 
     class _StubBase:
         """Marker base – not a real DeclarativeBase, just provides __init__."""
+
         def __init__(self, **kwargs):
             for k, v in kwargs.items():
                 setattr(self, k, v)
@@ -204,6 +205,7 @@ def install_airflow_stubs():
 
     class _DagBag:
         """Minimal DagBag stub – dependency analysis is not supported standalone."""
+
         def __init__(self, *args, **kwargs):
             self.dags = {}
 
@@ -228,7 +230,15 @@ def install_airflow_stubs():
 
     # --- airflow.configuration ---
     conf_mod = ModuleType("airflow.configuration")
-    conf_mod.conf = type("conf", (), {"get": staticmethod(lambda *a, **kw: ""), "getint": staticmethod(lambda *a, **kw: 0), "getboolean": staticmethod(lambda *a, **kw: False)})()
+    conf_mod.conf = type(
+        "conf",
+        (),
+        {
+            "get": staticmethod(lambda *a, **kw: ""),
+            "getint": staticmethod(lambda *a, **kw: 0),
+            "getboolean": staticmethod(lambda *a, **kw: False),
+        },
+    )()
     sys.modules["airflow.configuration"] = conf_mod
 
     # --- airflow.plugins_manager ---

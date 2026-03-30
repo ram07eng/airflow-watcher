@@ -69,10 +69,12 @@ async def get_dag_health(
     failures = get_failure_monitor().get_recent_failures(dag_id=dag_id, limit=10)
     sla_misses = get_sla_monitor().get_recent_sla_misses(dag_id=dag_id, limit=10)
 
-    return success_response({
-        "dag_id": dag_id,
-        "recent_failures": [f.to_dict() for f in failures],
-        "recent_sla_misses": [s.to_dict() for s in sla_misses],
-        "failure_count": len(failures),
-        "sla_miss_count": len(sla_misses),
-    })
+    return success_response(
+        {
+            "dag_id": dag_id,
+            "recent_failures": [f.to_dict() for f in failures],
+            "recent_sla_misses": [s.to_dict() for s in sla_misses],
+            "failure_count": len(failures),
+            "sla_miss_count": len(sla_misses),
+        }
+    )

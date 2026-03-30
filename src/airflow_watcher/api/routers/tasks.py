@@ -30,11 +30,13 @@ async def get_long_running_tasks(
     tasks = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     tasks = filter_dags(tasks, allowed)
 
-    return success_response({
-        "tasks": tasks,
-        "count": len(tasks),
-        "threshold_minutes": threshold_minutes,
-    })
+    return success_response(
+        {
+            "tasks": tasks,
+            "count": len(tasks),
+            "threshold_minutes": threshold_minutes,
+        }
+    )
 
 
 @router.get("/retries")
@@ -54,10 +56,12 @@ async def get_retry_heavy_tasks(
     tasks = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     tasks = filter_dags(tasks, allowed)
 
-    return success_response({
-        "tasks": tasks,
-        "count": len(tasks),
-    })
+    return success_response(
+        {
+            "tasks": tasks,
+            "count": len(tasks),
+        }
+    )
 
 
 @router.get("/zombies")
@@ -76,11 +80,13 @@ async def get_zombie_tasks(
     tasks = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     tasks = filter_dags(tasks, allowed)
 
-    return success_response({
-        "zombies": tasks,
-        "count": len(tasks),
-        "threshold_minutes": threshold_minutes,
-    })
+    return success_response(
+        {
+            "zombies": tasks,
+            "count": len(tasks),
+            "threshold_minutes": threshold_minutes,
+        }
+    )
 
 
 @router.get("/failure-patterns")
@@ -104,8 +110,6 @@ async def get_failure_patterns(
         filtered = {**patterns}
         for key in ("top_failing_tasks", "flaky_tasks"):
             if key in filtered:
-                filtered[key] = [
-                    t for t in filtered[key] if t.get("dag_id") in allowed
-                ]
+                filtered[key] = [t for t in filtered[key] if t.get("dag_id") in allowed]
         patterns = filtered
     return success_response(patterns)

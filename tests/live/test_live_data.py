@@ -1,16 +1,15 @@
 #!/usr/bin/env python
 """Show sample data from key endpoints."""
-import urllib.request
+
 import json
+import urllib.request
 
 API_KEY = "v8LEah9G93MOoPJn7WUUm8vYp6jEsnFmC_FOpMX1ctU"
 BASE = "http://localhost:8083/api/v1"
 
 
 def fetch(ep):
-    req = urllib.request.Request(
-        BASE + ep, headers={"Authorization": f"Bearer {API_KEY}"}
-    )
+    req = urllib.request.Request(BASE + ep, headers={"Authorization": f"Bearer {API_KEY}"})
     return json.loads(urllib.request.urlopen(req).read().decode())
 
 

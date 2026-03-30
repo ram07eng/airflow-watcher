@@ -7,7 +7,7 @@ FastAPI dependency that yields scoped sessions for use by monitors.
 import logging
 import sys
 import warnings
-from typing import Generator, Optional
+from typing import Generator
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -48,8 +48,11 @@ def init_db(db_uri: str, query_timeout_ms: int = 30000) -> None:
     # Only log host/port, never credentials or full URI.
     try:
         from urllib.parse import urlparse
+
         _parsed = urlparse(db_uri)
-        logger.info("Database connection established: %s://%s:%s", _parsed.scheme, _parsed.hostname, _parsed.port or "default")
+        logger.info(
+            "Database connection established: %s://%s:%s", _parsed.scheme, _parsed.hostname, _parsed.port or "default"
+        )
     except Exception:
         logger.info("Database connection established")
 

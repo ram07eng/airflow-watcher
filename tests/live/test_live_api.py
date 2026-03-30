@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Quick smoke test for the live standalone API."""
-import urllib.request
+
 import json
+import urllib.request
 
 API_KEY = "v8LEah9G93MOoPJn7WUUm8vYp6jEsnFmC_FOpMX1ctU"
 BASE = "http://localhost:8083/api/v1"
@@ -34,9 +35,7 @@ endpoints = [
 
 for ep in endpoints:
     try:
-        req = urllib.request.Request(
-            BASE + ep, headers={"Authorization": f"Bearer {API_KEY}"}
-        )
+        req = urllib.request.Request(BASE + ep, headers={"Authorization": f"Bearer {API_KEY}"})
         resp = urllib.request.urlopen(req)
         data = json.loads(resp.read().decode())
         if isinstance(data.get("data"), list):

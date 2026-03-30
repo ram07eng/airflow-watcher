@@ -236,7 +236,7 @@ class AlertManager:
                 return True
 
             cooldown = timedelta(minutes=rule.cooldown_minutes)
-            return timezone.utcnow() - last_alert >= cooldown
+            return bool(timezone.utcnow() - last_alert >= cooldown)
 
     def _record_alert(self, rule_name: str):
         """Record that an alert was sent."""
@@ -297,6 +297,7 @@ class AlertManager:
                 continue
 
             try:
+                success = False
                 if channel == AlertChannel.SLACK:
                     success = notifier.send_threshold_alert(
                         metric_name=alert.metric,
@@ -317,8 +318,6 @@ class AlertManager:
                         threshold=alert.threshold,
                         severity=alert.severity.value,
                     )
-                else:
-                    success = False
 
                 results[channel] = success
 
@@ -431,7 +430,7 @@ class AlertManager:
 
         try:
             if hasattr(notifier, "send_test_alert"):
-                return notifier.send_test_alert()
+                return bool(notifier.send_test_alert())
             else:
                 # Generic test
                 if channel == AlertChannel.SLACK:

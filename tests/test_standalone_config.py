@@ -1,7 +1,9 @@
 """Tests for StandaloneConfig."""
 
 import json
+
 import pytest
+
 from airflow_watcher.api.standalone_config import StandaloneConfig
 
 

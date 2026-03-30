@@ -8,16 +8,19 @@ Tests:
   3. RBAC filtering: weather_user sees only weather DAGs, etc.
   4. Auth edge cases: missing token, bad token, no-auth healthz
 """
-import json
-import urllib.request
-import urllib.error
+
 import base64
+import json
 import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 
 PASS = 0
 FAIL = 0
 SKIP = 0
+
 
 def result(ok, label, detail=""):
     global PASS, FAIL
@@ -29,10 +32,12 @@ def result(ok, label, detail=""):
     suffix = f" — {detail}" if detail else ""
     print(f"  [{status}] {label}{suffix}")
 
+
 def skip(label, reason):
     global SKIP
     SKIP += 1
     print(f"  [\033[93mSKIP\033[0m] {label} — {reason}")
+
 
 def http_get(url, headers=None, timeout=15):
     """Return (status_code, body_dict_or_str)."""
@@ -52,6 +57,7 @@ def http_get(url, headers=None, timeout=15):
             return e.code, body
     except Exception as e:
         return 0, str(e)
+
 
 def basic_auth_header(user, password):
     creds = base64.b64encode(f"{user}:{password}".encode()).decode()
@@ -109,6 +115,7 @@ def get_airflow_session(base_url, user, password):
         html = resp.read().decode()
         # Extract csrf_token
         import re
+
         csrf_match = re.search(r'name="csrf_token"\s+.*?value="([^"]+)"', html)
         if not csrf_match:
             # Try alternate pattern
@@ -118,21 +125,20 @@ def get_airflow_session(base_url, user, password):
         csrf_token = csrf_match.group(1)
 
         # POST login
-        data = urllib.parse.urlencode({
-            "username": user,
-            "password": password,
-            "csrf_token": csrf_token,
-        }).encode()
+        data = urllib.parse.urlencode(
+            {
+                "username": user,
+                "password": password,
+                "csrf_token": csrf_token,
+            }
+        ).encode()
         login_req = urllib.request.Request(login_url, data=data, method="POST")
         login_req.add_header("Content-Type", "application/x-www-form-urlencoded")
-        login_resp = opener.open(login_req, timeout=10)
+        opener.open(login_req, timeout=10)
         # Return opener with cookies
         return opener, None
     except Exception as e:
         return None, str(e)
-
-
-import urllib.parse
 
 
 def test_watcher_plugin():
@@ -150,7 +156,7 @@ def test_watcher_plugin():
             skip(f"{ws['name']} webserver", f"Not reachable: {body}")
             continue
 
-        result(status == 200, f"Webserver health check", f"status={status}")
+        result(status == 200, "Webserver health check", f"status={status}")
 
         # Log in to get session
         opener, err = get_airflow_session(base, ws["user"], ws["password"])
@@ -168,11 +174,7 @@ def test_watcher_plugin():
                 status_code = resp.status
                 # Check for meaningful content
                 has_content = "watcher" in html.lower() or "dashboard" in html.lower() or "failure" in html.lower()
-                result(
-                    status_code == 200 and has_content,
-                    f"{page}",
-                    f"status={status_code}, size={len(html)} bytes"
-                )
+                result(status_code == 200 and has_content, f"{page}", f"status={status_code}, size={len(html)} bytes")
             except urllib.error.HTTPError as e:
                 result(False, f"{page}", f"HTTP {e.code}")
             except Exception as e:
@@ -185,7 +187,7 @@ def test_watcher_plugin():
             resp = opener.open(req, timeout=10)
             dags_data = json.loads(resp.read().decode())
             dag_ids = [d["dag_id"] for d in dags_data.get("dags", [])]
-            result(True, f"DAG visibility", f"sees {len(dag_ids)} DAGs: {dag_ids}")
+            result(True, "DAG visibility", f"sees {len(dag_ids)} DAGs: {dag_ids}")
         except Exception as e:
             skip("DAG visibility check", str(e)[:80])
 
@@ -257,7 +259,11 @@ def test_standalone_api():
     if status == 0:
         skip("Standalone API", f"Not reachable: {body}")
         return
-    result(status == 200, "Healthz (no auth required)", f"db_connected={body.get('db_connected') if isinstance(body, dict) else '?'}")
+    result(
+        status == 200,
+        "Healthz (no auth required)",
+        f"db_connected={body.get('db_connected') if isinstance(body, dict) else '?'}",
+    )
 
     for role_name, role_info in API_KEYS.items():
         key = role_info["key"]
@@ -290,14 +296,17 @@ def test_standalone_api():
             visible_dag_ids = {d["dag_id"] for d in dag_list if isinstance(d, dict) and "dag_id" in d}
             if expected_dags is None:
                 # Admin: should see all DAGs
-                result(len(visible_dag_ids) >= 4, f"RBAC: {role_name} sees all DAGs",
-                       f"visible={len(visible_dag_ids)} DAGs: {sorted(visible_dag_ids)}")
+                result(
+                    len(visible_dag_ids) >= 4,
+                    f"RBAC: {role_name} sees all DAGs",
+                    f"visible={len(visible_dag_ids)} DAGs: {sorted(visible_dag_ids)}",
+                )
             else:
                 # Scoped user: should see only mapped DAGs
                 result(
                     visible_dag_ids == expected_dags,
                     f"RBAC: {role_name} sees only {len(expected_dags)} DAGs",
-                    f"expected={sorted(expected_dags)}, got={sorted(visible_dag_ids)}"
+                    f"expected={sorted(expected_dags)}, got={sorted(visible_dag_ids)}",
                 )
         else:
             skip(f"RBAC check for {role_name}", f"complexity returned {status}")
@@ -311,8 +320,11 @@ def test_standalone_api():
                 result(True, f"RBAC: {role_name} failures unfiltered", f"dags in failures={sorted(failure_dag_ids)}")
             else:
                 leaked = failure_dag_ids - expected_dags
-                result(len(leaked) == 0, f"RBAC: {role_name} failures filtered",
-                       f"failure_dags={sorted(failure_dag_ids)}, leaked={sorted(leaked)}")
+                result(
+                    len(leaked) == 0,
+                    f"RBAC: {role_name} failures filtered",
+                    f"failure_dags={sorted(failure_dag_ids)}, leaked={sorted(leaked)}",
+                )
         else:
             skip(f"RBAC failure check for {role_name}", f"returned {status}")
 
@@ -320,17 +332,15 @@ def test_standalone_api():
         if expected_dags is not None:
             forbidden_dag = "ml_training_pipeline"  # Not in weather or ecommerce scope
             status, body = http_get(f"{API_BASE}/api/v1/health/{forbidden_dag}", headers=auth_header)
-            result(status == 403, f"RBAC: {role_name} blocked from {forbidden_dag}",
-                   f"status={status}")
+            result(status == 403, f"RBAC: {role_name} blocked from {forbidden_dag}", f"status={status}")
 
             allowed_dag = sorted(expected_dags)[0]
             status, body = http_get(f"{API_BASE}/api/v1/health/{allowed_dag}", headers=auth_header)
-            result(status == 200, f"RBAC: {role_name} can access {allowed_dag}",
-                   f"status={status}")
+            result(status == 200, f"RBAC: {role_name} can access {allowed_dag}", f"status={status}")
 
     # Test endpoints expected to return 501 in standalone mode (use admin key)
     admin_header = {"Authorization": f"Bearer {API_KEYS['admin']['key']}"}
-    print(f"\n  --- DagBag-dependent endpoints (expect 501 in standalone) ---")
+    print("\n  --- DagBag-dependent endpoints (expect 501 in standalone) ---")
     for method, ep in API_STANDALONE_501:
         status, body = http_get(f"{API_BASE}{ep}", headers=admin_header)
         ok = status == 501
@@ -343,6 +353,7 @@ def test_standalone_api():
 # ============================================================
 # SECTION 3: Auth Edge Cases
 # ============================================================
+
 
 def test_auth_edge_cases():
     print("\n" + "=" * 70)
@@ -386,7 +397,9 @@ def test_auth_edge_cases():
     result(status == 200, "Valid ecommerce bearer token → 200", f"got {status}")
 
     # 8. Old/revoked token -> 401
-    status, body = http_get(test_endpoint, headers={"Authorization": "Bearer v8LEah9G93MOoPJn7WUUm8vYp6jEsnFmC_FOpMX1ctU"})
+    status, body = http_get(
+        test_endpoint, headers={"Authorization": "Bearer v8LEah9G93MOoPJn7WUUm8vYp6jEsnFmC_FOpMX1ctU"}
+    )
     result(status == 401, "Old/revoked token → 401", f"got {status}")
 
     # 6. Healthz works without auth
@@ -408,6 +421,7 @@ def test_auth_edge_cases():
 # ============================================================
 # SECTION 4: Data Consistency (plugin vs API)
 # ============================================================
+
 
 def test_data_consistency():
     print("\n" + "=" * 70)

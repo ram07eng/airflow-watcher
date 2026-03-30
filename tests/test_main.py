@@ -1,6 +1,5 @@
 """Tests for api/main.py — FastAPI entry point, /healthz, and X-API-Version middleware."""
 
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,7 +7,6 @@ from fastapi.testclient import TestClient
 
 from airflow_watcher.api import main as main_module
 from airflow_watcher.api.main import create_app
-
 
 _SENTINEL = object()
 

@@ -27,14 +27,13 @@ async def get_import_errors(
 
     errors = await asyncio.to_thread(cache.get_or_compute, "dags:import-errors", _compute)
     if allowed is not None:
-        errors = [
-            e for e in errors
-            if any(dag_id in (e.get("filename") or "") for dag_id in allowed)
-        ]
-    return success_response({
-        "errors": errors,
-        "count": len(errors),
-    })
+        errors = [e for e in errors if any(dag_id in (e.get("filename") or "") for dag_id in allowed)]
+    return success_response(
+        {
+            "errors": errors,
+            "count": len(errors),
+        }
+    )
 
 
 @router.get("/status-summary")
@@ -70,10 +69,12 @@ async def get_dag_complexity(
     complexity = await asyncio.to_thread(cache.get_or_compute, "dags:complexity", _compute)
     complexity = filter_dags(complexity, allowed)
 
-    return success_response({
-        "dags": complexity,
-        "count": len(complexity),
-    })
+    return success_response(
+        {
+            "dags": complexity,
+            "count": len(complexity),
+        }
+    )
 
 
 @router.get("/inactive")
@@ -92,8 +93,10 @@ async def get_inactive_dags(
     inactive = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     inactive = filter_dags(inactive, allowed)
 
-    return success_response({
-        "inactive_dags": inactive,
-        "count": len(inactive),
-        "threshold_days": days,
-    })
+    return success_response(
+        {
+            "inactive_dags": inactive,
+            "count": len(inactive),
+            "threshold_days": days,
+        }
+    )

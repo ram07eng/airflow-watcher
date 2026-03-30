@@ -63,18 +63,14 @@ async def get_overview(
                 sub = data[stats_key]
                 for list_key in ("most_failing_dags", "top_dags_with_misses", "top_tasks_with_misses"):
                     if list_key in sub and isinstance(sub[list_key], list):
-                        data[stats_key] = {**sub, list_key: [
-                            d for d in sub[list_key] if d.get("dag_id") in allowed
-                        ]}
+                        data[stats_key] = {**sub, list_key: [d for d in sub[list_key] if d.get("dag_id") in allowed]}
                         sub = data[stats_key]
         # Filter queue task lists
         qs = data.get("queue_status")
         if isinstance(qs, dict):
             for key in ("queued_tasks", "scheduled_tasks"):
                 if key in qs and isinstance(qs[key], list):
-                    data["queue_status"] = {**qs, key: [
-                        t for t in qs[key] if t.get("dag_id") in allowed
-                    ]}
+                    data["queue_status"] = {**qs, key: [t for t in qs[key] if t.get("dag_id") in allowed]}
                     qs = data["queue_status"]
 
     return success_response(data)

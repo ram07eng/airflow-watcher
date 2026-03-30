@@ -1,9 +1,9 @@
 """Metrics Collector - Gathers metrics from monitors for emission."""
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 from airflow.utils import timezone
 
@@ -79,11 +79,11 @@ class MetricsCollector:
         """Lazily create and cache monitor instances."""
         if self._monitors is None:
             from airflow_watcher.monitors.dag_failure_monitor import DAGFailureMonitor
-            from airflow_watcher.monitors.sla_monitor import SLAMonitor
-            from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
-            from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
             from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
             from airflow_watcher.monitors.dependency_monitor import DependencyMonitor
+            from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
+            from airflow_watcher.monitors.sla_monitor import SLAMonitor
+            from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
 
             self._monitors = {
                 "failure": DAGFailureMonitor(),
@@ -127,9 +127,7 @@ class MetricsCollector:
 
             # Scheduling metrics
             scheduling_monitor = monitors["scheduling"]
-            scheduling_lag = scheduling_monitor.get_scheduling_lag(
-                lookback_hours=24, lag_threshold_minutes=10
-            )
+            scheduling_lag = scheduling_monitor.get_scheduling_lag(lookback_hours=24, lag_threshold_minutes=10)
             metrics.missed_schedules_24h = scheduling_lag.get("delayed_count", 0)
             stale = scheduling_monitor.get_stale_dags(expected_interval_hours=24)
             metrics.delayed_dags = len(stale)
@@ -152,9 +150,7 @@ class MetricsCollector:
 
             # Calculate failure rate
             if metrics.total_dags > 0:
-                metrics.failure_rate_percent = round(
-                    (metrics.unique_dag_failures_24h / metrics.total_dags) * 100, 2
-                )
+                metrics.failure_rate_percent = round((metrics.unique_dag_failures_24h / metrics.total_dags) * 100, 2)
 
             metrics.collected_at = timezone.utcnow()
             self._last_metrics = metrics
@@ -164,9 +160,10 @@ class MetricsCollector:
             if self._last_metrics:
                 # Return stale copy with is_stale flag set
                 import copy
+
                 stale = copy.copy(self._last_metrics)
                 stale.is_stale = True
-                return stale
+                return stale  # type: ignore[no-any-return]
 
         return metrics
 

@@ -1,6 +1,6 @@
 """Tests for MetricsCollector and WatcherMetrics."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from airflow_watcher.metrics.collector import MetricsCollector, WatcherMetrics
 

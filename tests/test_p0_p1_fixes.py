@@ -14,9 +14,6 @@ import asyncio
 import threading
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-
 # ============== C-5: StatsDEmitter thread safety ==============
 
 
@@ -102,6 +99,7 @@ class TestSafeInt:
 
     def _get_safe_int(self):
         from airflow_watcher.views.api import _safe_int
+
         return _safe_int
 
     def test_valid_int(self):
@@ -146,11 +144,14 @@ class TestRBACFailClosedDefault:
         with patch.dict("os.environ", {}, clear=False):
             # Remove the env var if it exists
             import os
+
             old_val = os.environ.pop("AIRFLOW_WATCHER_RBAC_FAIL_OPEN", None)
             try:
                 # Re-evaluate the module-level constant
                 import importlib
+
                 import airflow_watcher.utils.rbac as rbac_mod
+
                 importlib.reload(rbac_mod)
                 assert rbac_mod.RBAC_FAIL_OPEN is False
             finally:
@@ -162,11 +163,14 @@ class TestRBACFailClosedDefault:
     def test_env_true_opens(self):
         """Setting env var to 'true' should enable fail-open."""
         import os
+
         old_val = os.environ.get("AIRFLOW_WATCHER_RBAC_FAIL_OPEN")
         try:
             os.environ["AIRFLOW_WATCHER_RBAC_FAIL_OPEN"] = "true"
             import importlib
+
             import airflow_watcher.utils.rbac as rbac_mod
+
             importlib.reload(rbac_mod)
             assert rbac_mod.RBAC_FAIL_OPEN is True
         finally:
@@ -185,6 +189,7 @@ class TestZombieTasksBatchQuery:
     def test_imports_tuple_(self):
         """task_health_monitor should import tuple_ from sqlalchemy."""
         import airflow_watcher.monitors.task_health_monitor as thm
+
         # The module imports tuple_ at module level
         assert hasattr(thm, "tuple_")
 
@@ -196,8 +201,9 @@ class TestDagBagLimitParameters:
     """Verify DagBag-heavy methods accept limit parameters."""
 
     def test_complexity_analysis_has_limit_param(self):
-        from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
         import inspect
+
+        from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
 
         # provide_session wraps the method; check __wrapped__ if available
         method = DAGHealthMonitor.get_dag_complexity_analysis
@@ -206,8 +212,9 @@ class TestDagBagLimitParameters:
         assert "limit" in sig.parameters
 
     def test_cross_dag_deps_has_limit_param(self):
-        from airflow_watcher.monitors.dependency_monitor import DependencyMonitor
         import inspect
+
+        from airflow_watcher.monitors.dependency_monitor import DependencyMonitor
 
         method = DependencyMonitor.get_cross_dag_dependencies
         unwrapped = getattr(method, "__wrapped__", method)

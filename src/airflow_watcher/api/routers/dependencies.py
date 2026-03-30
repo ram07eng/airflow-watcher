@@ -1,7 +1,7 @@
 """Dependency monitoring endpoints."""
 
-import sys
 import asyncio
+import sys
 from typing import Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -37,10 +37,12 @@ async def get_upstream_failures(
     failures = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     failures = filter_dags(failures, allowed)
 
-    return success_response({
-        "upstream_failures": failures,
-        "count": len(failures),
-    })
+    return success_response(
+        {
+            "upstream_failures": failures,
+            "count": len(failures),
+        }
+    )
 
 
 @router.get("/cross-dag")
@@ -65,15 +67,18 @@ async def get_cross_dag_dependencies(
     deps = await asyncio.to_thread(cache.get_or_compute, "dependencies:cross-dag", _compute)
     if allowed is not None:
         deps = [
-            d for d in deps
+            d
+            for d in deps
             if isinstance(d, dict)
             and d.get("dag_id", d.get("source_dag_id")) in allowed
             and d.get("target_dag_id", d.get("dag_id")) in allowed
         ]
-    return success_response({
-        "dependencies": deps,
-        "count": len(deps),
-    })
+    return success_response(
+        {
+            "dependencies": deps,
+            "count": len(deps),
+        }
+    )
 
 
 @router.get("/correlations")
@@ -93,12 +98,16 @@ async def get_failure_correlations(
     if allowed is not None and isinstance(data, dict):
         for key in ("correlations", "correlated_failures"):
             if key in data and isinstance(data[key], list):
-                data = {**data, key: [
-                    c for c in data[key]
-                    if isinstance(c, dict)
-                    and (c.get("dag_id") in allowed or c.get("dag_id_a") in allowed)
-                    and (c.get("dag_id") in allowed or c.get("dag_id_b") in allowed)
-                ]}
+                data = {
+                    **data,
+                    key: [
+                        c
+                        for c in data[key]
+                        if isinstance(c, dict)
+                        and (c.get("dag_id") in allowed or c.get("dag_id_a") in allowed)
+                        and (c.get("dag_id") in allowed or c.get("dag_id_b") in allowed)
+                    ],
+                }
     return success_response(data)
 
 
@@ -135,9 +144,6 @@ async def get_task_impact(
     if allowed is not None and isinstance(data, dict):
         for key in ("downstream", "downstream_tasks", "impacted_tasks"):
             if key in data and isinstance(data[key], list):
-                data[key] = [
-                    item for item in data[key]
-                    if isinstance(item, dict) and item.get("dag_id") in allowed
-                ]
+                data[key] = [item for item in data[key] if isinstance(item, dict) and item.get("dag_id") in allowed]
 
     return success_response(data)

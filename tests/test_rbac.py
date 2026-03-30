@@ -22,10 +22,10 @@ from airflow_watcher.api.rbac_dep import (
     get_allowed_dag_ids,
 )
 
-
 # ---------------------------------------------------------------------------
 # Unit tests for rbac_dep helpers
 # ---------------------------------------------------------------------------
+
 
 class TestFilterDags:
     """Unit tests for filter_dags()."""
@@ -62,12 +62,14 @@ class TestCheckDagAccess:
 
     def test_dag_not_in_allowed_raises_403(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             check_dag_access("secret", {"allowed_dag"})
         assert exc_info.value.status_code == 403
 
     def test_empty_set_denies_all(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException):
             check_dag_access("any", set())
 
@@ -75,6 +77,7 @@ class TestCheckDagAccess:
 # ---------------------------------------------------------------------------
 # Integration tests: RBAC-enabled API client
 # ---------------------------------------------------------------------------
+
 
 def _build_rbac_app(api_keys, rbac_enabled, rbac_mapping, monitor_overrides=None):
     """Build a throwaway test FastAPI app with RBAC and mocked monitors."""
@@ -92,99 +95,148 @@ def _build_rbac_app(api_keys, rbac_enabled, rbac_mapping, monitor_overrides=None
         p.start()
         return mock_inst
 
-    dag_errors = monitor_overrides.get("import_errors", [
-        {"filename": "/dags/allowed_dag.py", "timestamp": "2024-01-01T00:00:00", "stacktrace": "err"},
-        {"filename": "/dags/secret_dag.py", "timestamp": "2024-01-01T00:00:00", "stacktrace": "err2"},
-    ]) if monitor_overrides else [
-        {"filename": "/dags/allowed_dag.py", "timestamp": "2024-01-01T00:00:00", "stacktrace": "err"},
-        {"filename": "/dags/secret_dag.py", "timestamp": "2024-01-01T00:00:00", "stacktrace": "err2"},
-    ]
+    dag_errors = (
+        monitor_overrides.get(
+            "import_errors",
+            [
+                {"filename": "/dags/allowed_dag.py", "timestamp": "2024-01-01T00:00:00", "stacktrace": "err"},
+                {"filename": "/dags/secret_dag.py", "timestamp": "2024-01-01T00:00:00", "stacktrace": "err2"},
+            ],
+        )
+        if monitor_overrides
+        else [
+            {"filename": "/dags/allowed_dag.py", "timestamp": "2024-01-01T00:00:00", "stacktrace": "err"},
+            {"filename": "/dags/secret_dag.py", "timestamp": "2024-01-01T00:00:00", "stacktrace": "err2"},
+        ]
+    )
 
-    _mock("airflow_watcher.api.routers.dags.get_dag_health_monitor", {
-        "get_dag_import_errors": dag_errors,
-        "get_dag_status_summary": {"total_dags": 50, "health_score": 95},
-        "get_dag_complexity_analysis": [
-            {"dag_id": "allowed_dag", "task_count": 5},
-            {"dag_id": "secret_dag", "task_count": 10},
-        ],
-        "get_inactive_dags": [
-            {"dag_id": "allowed_dag", "days_inactive": 45},
-            {"dag_id": "secret_dag", "days_inactive": 90},
-        ],
-    })
-    _mock("airflow_watcher.api.routers.scheduling.get_scheduling_monitor", {
-        "get_scheduling_lag": {"delayed_dags": [{"dag_id": "secret_dag"}]},
-        "get_queued_tasks": {"queued_tasks": [], "scheduled_tasks": []},
-        "get_pool_utilization": [{"pool_name": "default", "slots": 16}],
-        "get_stale_dags": [{"dag_id": "allowed_dag"}, {"dag_id": "secret_dag"}],
-        "get_concurrent_runs": {"concurrent_dags": [], "dags_with_concurrent_runs": 0},
-    })
-    _mock("airflow_watcher.api.routers.dependencies.get_dependency_monitor", {
-        "get_upstream_failures": [
-            {"dag_id": "allowed_dag", "task_id": "t1"},
-            {"dag_id": "secret_dag", "task_id": "t2"},
-        ],
-        "get_cross_dag_dependencies": [
-            {"dag_id": "allowed_dag", "target_dag_id": "allowed_dag"},
-            {"dag_id": "allowed_dag", "target_dag_id": "secret_dag"},
-            {"dag_id": "secret_dag", "target_dag_id": "secret_dag"},
-        ],
-        "get_failure_correlation": {
-            "correlations": [
-                {"dag_id_a": "allowed_dag", "dag_id_b": "allowed_dag"},
-                {"dag_id_a": "allowed_dag", "dag_id_b": "secret_dag"},
-                {"dag_id_a": "secret_dag", "dag_id_b": "secret_dag"},
-            ]
+    _mock(
+        "airflow_watcher.api.routers.dags.get_dag_health_monitor",
+        {
+            "get_dag_import_errors": dag_errors,
+            "get_dag_status_summary": {"total_dags": 50, "health_score": 95},
+            "get_dag_complexity_analysis": [
+                {"dag_id": "allowed_dag", "task_count": 5},
+                {"dag_id": "secret_dag", "task_count": 10},
+            ],
+            "get_inactive_dags": [
+                {"dag_id": "allowed_dag", "days_inactive": 45},
+                {"dag_id": "secret_dag", "days_inactive": 90},
+            ],
         },
-        "get_cascading_failure_impact": {
-            "downstream_tasks": [
+    )
+    _mock(
+        "airflow_watcher.api.routers.scheduling.get_scheduling_monitor",
+        {
+            "get_scheduling_lag": {"delayed_dags": [{"dag_id": "secret_dag"}]},
+            "get_queued_tasks": {"queued_tasks": [], "scheduled_tasks": []},
+            "get_pool_utilization": [{"pool_name": "default", "slots": 16}],
+            "get_stale_dags": [{"dag_id": "allowed_dag"}, {"dag_id": "secret_dag"}],
+            "get_concurrent_runs": {"concurrent_dags": [], "dags_with_concurrent_runs": 0},
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.dependencies.get_dependency_monitor",
+        {
+            "get_upstream_failures": [
                 {"dag_id": "allowed_dag", "task_id": "t1"},
                 {"dag_id": "secret_dag", "task_id": "t2"},
             ],
+            "get_cross_dag_dependencies": [
+                {"dag_id": "allowed_dag", "target_dag_id": "allowed_dag"},
+                {"dag_id": "allowed_dag", "target_dag_id": "secret_dag"},
+                {"dag_id": "secret_dag", "target_dag_id": "secret_dag"},
+            ],
+            "get_failure_correlation": {
+                "correlations": [
+                    {"dag_id_a": "allowed_dag", "dag_id_b": "allowed_dag"},
+                    {"dag_id_a": "allowed_dag", "dag_id_b": "secret_dag"},
+                    {"dag_id_a": "secret_dag", "dag_id_b": "secret_dag"},
+                ]
+            },
+            "get_cascading_failure_impact": {
+                "downstream_tasks": [
+                    {"dag_id": "allowed_dag", "task_id": "t1"},
+                    {"dag_id": "secret_dag", "task_id": "t2"},
+                ],
+            },
         },
-    })
-    _mock("airflow_watcher.api.routers.failures.get_failure_monitor", {
-        "get_recent_failures": [],
-        "get_failure_statistics": {"total_runs": 10, "most_failing_dags": []},
-    })
-    _mock("airflow_watcher.api.routers.sla.get_sla_monitor", {
-        "get_recent_sla_misses": [],
-        "get_sla_statistics": {"total_misses": 0, "top_dags_with_misses": [], "top_tasks_with_misses": []},
-    })
-    _mock("airflow_watcher.api.routers.tasks.get_task_monitor", {
-        "get_long_running_tasks": [],
-        "get_retry_heavy_tasks": [],
-        "get_zombie_tasks": [],
-        "get_task_failure_patterns": {"total_failures": 0},
-    })
-    _mock("airflow_watcher.api.routers.overview.get_failure_monitor", {
-        "get_failure_statistics": {"most_failing_dags": []},
-    })
-    _mock("airflow_watcher.api.routers.overview.get_sla_monitor", {
-        "get_sla_statistics": {"top_dags_with_misses": [], "top_tasks_with_misses": []},
-    })
-    _mock("airflow_watcher.api.routers.overview.get_task_monitor", {
-        "get_long_running_tasks": [],
-        "get_zombie_tasks": [],
-    })
-    _mock("airflow_watcher.api.routers.overview.get_scheduling_monitor", {
-        "get_queued_tasks": {"queued_tasks": [], "scheduled_tasks": []},
-    })
-    _mock("airflow_watcher.api.routers.overview.get_dag_health_monitor", {
-        "get_dag_status_summary": {},
-        "get_dag_import_errors": [],
-    })
-    _mock("airflow_watcher.api.routers.health.get_dag_health_monitor", {
-        "get_dag_status_summary": {"health_score": 95},
-        "get_dag_import_errors": [],
-    })
-    _mock("airflow_watcher.api.routers.health.get_failure_monitor", {
-        "get_dag_health_status": {"summary": {}},
-        "get_recent_failures": [],
-    })
-    _mock("airflow_watcher.api.routers.health.get_sla_monitor", {
-        "get_recent_sla_misses": [],
-    })
+    )
+    _mock(
+        "airflow_watcher.api.routers.failures.get_failure_monitor",
+        {
+            "get_recent_failures": [],
+            "get_failure_statistics": {"total_runs": 10, "most_failing_dags": []},
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.sla.get_sla_monitor",
+        {
+            "get_recent_sla_misses": [],
+            "get_sla_statistics": {"total_misses": 0, "top_dags_with_misses": [], "top_tasks_with_misses": []},
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.tasks.get_task_monitor",
+        {
+            "get_long_running_tasks": [],
+            "get_retry_heavy_tasks": [],
+            "get_zombie_tasks": [],
+            "get_task_failure_patterns": {"total_failures": 0},
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.overview.get_failure_monitor",
+        {
+            "get_failure_statistics": {"most_failing_dags": []},
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.overview.get_sla_monitor",
+        {
+            "get_sla_statistics": {"top_dags_with_misses": [], "top_tasks_with_misses": []},
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.overview.get_task_monitor",
+        {
+            "get_long_running_tasks": [],
+            "get_zombie_tasks": [],
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.overview.get_scheduling_monitor",
+        {
+            "get_queued_tasks": {"queued_tasks": [], "scheduled_tasks": []},
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.overview.get_dag_health_monitor",
+        {
+            "get_dag_status_summary": {},
+            "get_dag_import_errors": [],
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.health.get_dag_health_monitor",
+        {
+            "get_dag_status_summary": {"health_score": 95},
+            "get_dag_import_errors": [],
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.health.get_failure_monitor",
+        {
+            "get_dag_health_status": {"summary": {}},
+            "get_recent_failures": [],
+        },
+    )
+    _mock(
+        "airflow_watcher.api.routers.health.get_sla_monitor",
+        {
+            "get_recent_sla_misses": [],
+        },
+    )
     p_standalone = patch("airflow_watcher.api.routers.dependencies._is_standalone", return_value=False)
     patches.append(p_standalone)
     p_standalone.start()
@@ -202,9 +254,18 @@ def _build_rbac_app(api_keys, rbac_enabled, rbac_mapping, monitor_overrides=None
 
     app = FastAPI()
     v1 = APIRouter(prefix="/api/v1")
-    for r in (failures_router, sla_router, tasks_router, scheduling_router,
-              dags_router, deps_router, overview_router, health_router,
-              alerts_router, cache_router):
+    for r in (
+        failures_router,
+        sla_router,
+        tasks_router,
+        scheduling_router,
+        dags_router,
+        deps_router,
+        overview_router,
+        health_router,
+        alerts_router,
+        cache_router,
+    ):
         v1.include_router(r)
     app.include_router(v1)
 
@@ -215,6 +276,7 @@ def _build_rbac_app(api_keys, rbac_enabled, rbac_mapping, monitor_overrides=None
 def rbac_client():
     """RBAC-enabled client: key 'rbac-key' maps to ['allowed_dag']."""
     from airflow_watcher.utils.cache import MetricsCache
+
     MetricsCache.get_instance().clear()
 
     app, patches = _build_rbac_app(
@@ -231,6 +293,7 @@ def rbac_client():
 def admin_client():
     """RBAC-enabled client: key 'admin-key' maps to ['*'] (full access)."""
     from airflow_watcher.utils.cache import MetricsCache
+
     MetricsCache.get_instance().clear()
 
     app, patches = _build_rbac_app(
@@ -246,6 +309,7 @@ def admin_client():
 # ---------------------------------------------------------------------------
 # Test: import-errors endpoint RBAC filtering
 # ---------------------------------------------------------------------------
+
 
 class TestImportErrorsRBAC:
     def test_restricted_user_sees_only_allowed_errors(self, rbac_client):
@@ -272,6 +336,7 @@ class TestImportErrorsRBAC:
 # Test: complexity endpoint RBAC filtering
 # ---------------------------------------------------------------------------
 
+
 class TestComplexityRBAC:
     def test_restricted_user_sees_only_allowed_dags(self, rbac_client):
         resp = rbac_client.get(
@@ -288,6 +353,7 @@ class TestComplexityRBAC:
 # ---------------------------------------------------------------------------
 # Test: inactive dags endpoint RBAC filtering
 # ---------------------------------------------------------------------------
+
 
 class TestInactiveDagsRBAC:
     def test_restricted_user_sees_only_allowed(self, rbac_client):
@@ -306,6 +372,7 @@ class TestInactiveDagsRBAC:
 # Test: stale dags endpoint RBAC filtering
 # ---------------------------------------------------------------------------
 
+
 class TestStaleDagsRBAC:
     def test_restricted_user_sees_only_allowed(self, rbac_client):
         resp = rbac_client.get(
@@ -322,6 +389,7 @@ class TestStaleDagsRBAC:
 # ---------------------------------------------------------------------------
 # Test: pools endpoint requires auth
 # ---------------------------------------------------------------------------
+
 
 class TestPoolsAuth:
     def test_pools_returns_data_with_auth(self, rbac_client):
@@ -341,6 +409,7 @@ class TestPoolsAuth:
 # Test: cross-dag dependency RBAC (both dag_ids must be allowed)
 # ---------------------------------------------------------------------------
 
+
 class TestCrossDagRBAC:
     def test_only_both_sides_allowed(self, rbac_client):
         resp = rbac_client.get(
@@ -359,6 +428,7 @@ class TestCrossDagRBAC:
 # ---------------------------------------------------------------------------
 # Test: correlations RBAC (both sides)
 # ---------------------------------------------------------------------------
+
 
 class TestCorrelationsRBAC:
     def test_correlations_both_sides(self, rbac_client):
@@ -380,6 +450,7 @@ class TestCorrelationsRBAC:
 # Test: upstream failures RBAC
 # ---------------------------------------------------------------------------
 
+
 class TestUpstreamFailuresRBAC:
     def test_restricted_user_filtered(self, rbac_client):
         resp = rbac_client.get(
@@ -396,6 +467,7 @@ class TestUpstreamFailuresRBAC:
 # ---------------------------------------------------------------------------
 # Test: overview cache is user-scoped
 # ---------------------------------------------------------------------------
+
 
 class TestOverviewCacheScoping:
     def test_overview_returns_200_for_restricted_user(self, rbac_client):
@@ -417,6 +489,7 @@ class TestOverviewCacheScoping:
 # Test: impact endpoint filters non-dict and restricted downstream
 # ---------------------------------------------------------------------------
 
+
 class TestImpactRBAC:
     def test_impact_filters_restricted_downstream(self, rbac_client):
         resp = rbac_client.get(
@@ -434,13 +507,14 @@ class TestImpactRBAC:
 # Test: configure_rbac / get_allowed_dag_ids
 # ---------------------------------------------------------------------------
 
+
 class TestConfigureRBAC:
     def test_wildcard_returns_none(self):
         """Key mapped to ['*'] should get None (full access)."""
         configure_rbac(True, {"key1": ["*"]})
 
         import asyncio
-        from unittest.mock import AsyncMock
+
         from airflow_watcher.api.rbac_dep import get_allowed_dag_ids
 
         # Simulate the dependency call
@@ -451,6 +525,7 @@ class TestConfigureRBAC:
         configure_rbac(True, {"key1": ["dag_a"]})
 
         import asyncio
+
         result = asyncio.get_event_loop().run_until_complete(get_allowed_dag_ids("unknown_key"))
         assert result == set()
 
@@ -458,5 +533,6 @@ class TestConfigureRBAC:
         configure_rbac(False, {"key1": ["dag_a"]})
 
         import asyncio
+
         result = asyncio.get_event_loop().run_until_complete(get_allowed_dag_ids("key1"))
         assert result is None

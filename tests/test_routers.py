@@ -8,10 +8,10 @@ from fastapi.testclient import TestClient
 from airflow_watcher.api.auth import configure_auth
 from airflow_watcher.api.rbac_dep import configure_rbac
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 def _build_test_app(api_keys=None):
     """Build an app with all routers wired but monitors mocked."""
@@ -31,72 +31,114 @@ def _build_test_app(api_keys=None):
         p.start()
         return mock_inst
 
-    _mock_provider("airflow_watcher.api.routers.failures.get_failure_monitor", {
-        "get_recent_failures": [],
-        "get_failure_statistics": {"total_runs": 100, "failed_runs": 5},
-        "get_dag_health_status": {"summary": {}},
-    })
-    _mock_provider("airflow_watcher.api.routers.sla.get_sla_monitor", {
-        "get_recent_sla_misses": [],
-        "get_sla_statistics": {"total_misses": 2},
-    })
-    _mock_provider("airflow_watcher.api.routers.tasks.get_task_monitor", {
-        "get_long_running_tasks": [],
-        "get_retry_heavy_tasks": [],
-        "get_zombie_tasks": [],
-        "get_task_failure_patterns": {"total_failures": 0},
-    })
-    _mock_provider("airflow_watcher.api.routers.scheduling.get_scheduling_monitor", {
-        "get_scheduling_lag": {"avg": 1.5},
-        "get_queued_tasks": {"queued": 0, "scheduled": 0},
-        "get_pool_utilization": [],
-        "get_stale_dags": [],
-        "get_concurrent_runs": [],
-    })
-    _mock_provider("airflow_watcher.api.routers.dags.get_dag_health_monitor", {
-        "get_dag_import_errors": [],
-        "get_dag_status_summary": {"total_dags": 50, "health_score": 95},
-        "get_dag_complexity_analysis": [],
-        "get_inactive_dags": [],
-    })
-    _mock_provider("airflow_watcher.api.routers.dependencies.get_dependency_monitor", {
-        "get_upstream_failures": [],
-        "get_cross_dag_dependencies": [],
-        "get_failure_correlation": {"correlations": []},
-        "get_cascading_failure_impact": {"impacted": 0},
-    })
+    _mock_provider(
+        "airflow_watcher.api.routers.failures.get_failure_monitor",
+        {
+            "get_recent_failures": [],
+            "get_failure_statistics": {"total_runs": 100, "failed_runs": 5},
+            "get_dag_health_status": {"summary": {}},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.sla.get_sla_monitor",
+        {
+            "get_recent_sla_misses": [],
+            "get_sla_statistics": {"total_misses": 2},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.tasks.get_task_monitor",
+        {
+            "get_long_running_tasks": [],
+            "get_retry_heavy_tasks": [],
+            "get_zombie_tasks": [],
+            "get_task_failure_patterns": {"total_failures": 0},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.scheduling.get_scheduling_monitor",
+        {
+            "get_scheduling_lag": {"avg": 1.5},
+            "get_queued_tasks": {"queued": 0, "scheduled": 0},
+            "get_pool_utilization": [],
+            "get_stale_dags": [],
+            "get_concurrent_runs": [],
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.dags.get_dag_health_monitor",
+        {
+            "get_dag_import_errors": [],
+            "get_dag_status_summary": {"total_dags": 50, "health_score": 95},
+            "get_dag_complexity_analysis": [],
+            "get_inactive_dags": [],
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.dependencies.get_dependency_monitor",
+        {
+            "get_upstream_failures": [],
+            "get_cross_dag_dependencies": [],
+            "get_failure_correlation": {"correlations": []},
+            "get_cascading_failure_impact": {"impacted": 0},
+        },
+    )
 
     # Health router imports its own copies of the provider functions.
-    _mock_provider("airflow_watcher.api.routers.health.get_dag_health_monitor", {
-        "get_dag_status_summary": {"total_dags": 50, "health_score": 95},
-        "get_dag_import_errors": [],
-    })
-    _mock_provider("airflow_watcher.api.routers.health.get_failure_monitor", {
-        "get_dag_health_status": {"summary": {}},
-        "get_recent_failures": [],
-    })
-    _mock_provider("airflow_watcher.api.routers.health.get_sla_monitor", {
-        "get_recent_sla_misses": [],
-    })
+    _mock_provider(
+        "airflow_watcher.api.routers.health.get_dag_health_monitor",
+        {
+            "get_dag_status_summary": {"total_dags": 50, "health_score": 95},
+            "get_dag_import_errors": [],
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.health.get_failure_monitor",
+        {
+            "get_dag_health_status": {"summary": {}},
+            "get_recent_failures": [],
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.health.get_sla_monitor",
+        {
+            "get_recent_sla_misses": [],
+        },
+    )
 
     # Overview router imports its own copies of the provider functions.
-    _mock_provider("airflow_watcher.api.routers.overview.get_failure_monitor", {
-        "get_failure_statistics": {"total_runs": 100},
-    })
-    _mock_provider("airflow_watcher.api.routers.overview.get_sla_monitor", {
-        "get_sla_statistics": {"total_misses": 0},
-    })
-    _mock_provider("airflow_watcher.api.routers.overview.get_task_monitor", {
-        "get_long_running_tasks": [],
-        "get_zombie_tasks": [],
-    })
-    _mock_provider("airflow_watcher.api.routers.overview.get_scheduling_monitor", {
-        "get_queued_tasks": {"queued": 0},
-    })
-    _mock_provider("airflow_watcher.api.routers.overview.get_dag_health_monitor", {
-        "get_dag_status_summary": {"total_dags": 50},
-        "get_dag_import_errors": [],
-    })
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_failure_monitor",
+        {
+            "get_failure_statistics": {"total_runs": 100},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_sla_monitor",
+        {
+            "get_sla_statistics": {"total_misses": 0},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_task_monitor",
+        {
+            "get_long_running_tasks": [],
+            "get_zombie_tasks": [],
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_scheduling_monitor",
+        {
+            "get_queued_tasks": {"queued": 0},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_dag_health_monitor",
+        {
+            "get_dag_status_summary": {"total_dags": 50},
+            "get_dag_import_errors": [],
+        },
+    )
 
     # Prevent 501 on DagBag-dependent endpoints in test mode.
     p_standalone = patch("airflow_watcher.api.routers.dependencies._is_standalone", return_value=False)
@@ -140,6 +182,7 @@ def client():
     """App with auth disabled, monitors mocked."""
     # Clear the cache so each test gets fresh data.
     from airflow_watcher.utils.cache import MetricsCache
+
     MetricsCache.get_instance().clear()
 
     app, patches = _build_test_app()
@@ -152,6 +195,7 @@ def client():
 def auth_client():
     """App with auth enabled (valid key = 'test-key')."""
     from airflow_watcher.utils.cache import MetricsCache
+
     MetricsCache.get_instance().clear()
 
     app, patches = _build_test_app(api_keys=["test-key"])
@@ -163,6 +207,7 @@ def auth_client():
 # ---------------------------------------------------------------------------
 # Envelope format
 # ---------------------------------------------------------------------------
+
 
 class TestEnvelopeFormat:
     """All endpoints return {status, data, timestamp}."""
@@ -205,6 +250,7 @@ class TestEnvelopeFormat:
 # API versioning
 # ---------------------------------------------------------------------------
 
+
 class TestVersioning:
     """Unversioned paths should 404."""
 
@@ -220,6 +266,7 @@ class TestVersioning:
 # ---------------------------------------------------------------------------
 # Auth gate
 # ---------------------------------------------------------------------------
+
 
 class TestAuthGate:
     def test_missing_auth_returns_401(self, auth_client):
@@ -244,6 +291,7 @@ class TestAuthGate:
 # ---------------------------------------------------------------------------
 # Specific endpoint behaviour
 # ---------------------------------------------------------------------------
+
 
 class TestFailuresEndpoints:
     def test_failures_returns_count(self, client):

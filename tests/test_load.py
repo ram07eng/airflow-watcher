@@ -15,7 +15,6 @@ Exclude load tests:   ``pytest -m 'not load'``
 import statistics
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -32,6 +31,7 @@ pytestmark = pytest.mark.load
 # Test app builder (monitors return instantly with canned data)
 # ---------------------------------------------------------------------------
 
+
 def _build_load_test_app():
     configure_auth([])
     configure_rbac(False, {})
@@ -47,46 +47,79 @@ def _build_load_test_app():
         patches.append(p)
         p.start()
 
-    _mock_provider("airflow_watcher.api.routers.failures.get_failure_monitor", {
-        "get_recent_failures": [],
-        "get_failure_statistics": {"total_runs": 500, "failed_runs": 12, "failure_rate": 2.4},
-    })
-    _mock_provider("airflow_watcher.api.routers.sla.get_sla_monitor", {
-        "get_recent_sla_misses": [],
-        "get_sla_statistics": {"total_misses": 3},
-    })
-    _mock_provider("airflow_watcher.api.routers.tasks.get_task_monitor", {
-        "get_long_running_tasks": [{"dag_id": f"dag_{i}", "task_id": f"task_{i}", "duration": 100 + i} for i in range(20)],
-        "get_retry_heavy_tasks": [],
-        "get_zombie_tasks": [],
-        "get_task_failure_patterns": {"total_failures": 0},
-    })
-    _mock_provider("airflow_watcher.api.routers.scheduling.get_scheduling_monitor", {
-        "get_scheduling_lag": {"avg": 2.1, "p50": 1.5, "p90": 4.0, "p95": 5.2, "max": 10.0},
-        "get_queued_tasks": {"queued": 15, "scheduled": 8},
-        "get_pool_utilization": [{"pool": "default", "total_slots": 128, "running": 45}],
-        "get_stale_dags": [],
-        "get_concurrent_runs": [],
-    })
-    _mock_provider("airflow_watcher.api.routers.dags.get_dag_health_monitor", {
-        "get_dag_import_errors": [],
-        "get_dag_status_summary": {"total_dags": 4500, "active_dags": 4200, "health_score": 92},
-        "get_dag_complexity_analysis": [{"dag_id": f"dag_{i}", "task_count": 50 - i} for i in range(50)],
-        "get_inactive_dags": [],
-    })
-    _mock_provider("airflow_watcher.api.routers.dependencies.get_dependency_monitor", {
-        "get_upstream_failures": [],
-        "get_cross_dag_dependencies": [],
-        "get_failure_correlation": {"correlations": []},
-        "get_cascading_failure_impact": {"impacted": 0},
-    })
-    _mock_provider("airflow_watcher.api.routers.overview.get_failure_monitor", {"get_failure_statistics": {"total_runs": 500}})
+    _mock_provider(
+        "airflow_watcher.api.routers.failures.get_failure_monitor",
+        {
+            "get_recent_failures": [],
+            "get_failure_statistics": {"total_runs": 500, "failed_runs": 12, "failure_rate": 2.4},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.sla.get_sla_monitor",
+        {
+            "get_recent_sla_misses": [],
+            "get_sla_statistics": {"total_misses": 3},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.tasks.get_task_monitor",
+        {
+            "get_long_running_tasks": [
+                {"dag_id": f"dag_{i}", "task_id": f"task_{i}", "duration": 100 + i} for i in range(20)
+            ],
+            "get_retry_heavy_tasks": [],
+            "get_zombie_tasks": [],
+            "get_task_failure_patterns": {"total_failures": 0},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.scheduling.get_scheduling_monitor",
+        {
+            "get_scheduling_lag": {"avg": 2.1, "p50": 1.5, "p90": 4.0, "p95": 5.2, "max": 10.0},
+            "get_queued_tasks": {"queued": 15, "scheduled": 8},
+            "get_pool_utilization": [{"pool": "default", "total_slots": 128, "running": 45}],
+            "get_stale_dags": [],
+            "get_concurrent_runs": [],
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.dags.get_dag_health_monitor",
+        {
+            "get_dag_import_errors": [],
+            "get_dag_status_summary": {"total_dags": 4500, "active_dags": 4200, "health_score": 92},
+            "get_dag_complexity_analysis": [{"dag_id": f"dag_{i}", "task_count": 50 - i} for i in range(50)],
+            "get_inactive_dags": [],
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.dependencies.get_dependency_monitor",
+        {
+            "get_upstream_failures": [],
+            "get_cross_dag_dependencies": [],
+            "get_failure_correlation": {"correlations": []},
+            "get_cascading_failure_impact": {"impacted": 0},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_failure_monitor", {"get_failure_statistics": {"total_runs": 500}}
+    )
     _mock_provider("airflow_watcher.api.routers.overview.get_sla_monitor", {"get_sla_statistics": {"total_misses": 0}})
-    _mock_provider("airflow_watcher.api.routers.overview.get_task_monitor", {"get_long_running_tasks": [], "get_zombie_tasks": []})
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_task_monitor", {"get_long_running_tasks": [], "get_zombie_tasks": []}
+    )
     _mock_provider("airflow_watcher.api.routers.overview.get_scheduling_monitor", {"get_queued_tasks": {"queued": 0}})
-    _mock_provider("airflow_watcher.api.routers.overview.get_dag_health_monitor", {"get_dag_status_summary": {"total_dags": 4500}, "get_dag_import_errors": []})
-    _mock_provider("airflow_watcher.api.routers.health.get_dag_health_monitor", {"get_dag_status_summary": {"health_score": 92}, "get_dag_import_errors": []})
-    _mock_provider("airflow_watcher.api.routers.health.get_failure_monitor", {"get_dag_health_status": {"summary": {}}, "get_recent_failures": []})
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_dag_health_monitor",
+        {"get_dag_status_summary": {"total_dags": 4500}, "get_dag_import_errors": []},
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.health.get_dag_health_monitor",
+        {"get_dag_status_summary": {"health_score": 92}, "get_dag_import_errors": []},
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.health.get_failure_monitor",
+        {"get_dag_health_status": {"summary": {}}, "get_recent_failures": []},
+    )
     _mock_provider("airflow_watcher.api.routers.health.get_sla_monitor", {"get_recent_sla_misses": []})
 
     from airflow_watcher.api.routers.alerts import router as alerts_router
@@ -102,9 +135,18 @@ def _build_load_test_app():
 
     app = FastAPI()
     v1 = APIRouter(prefix="/api/v1")
-    for r in (failures_router, sla_router, tasks_router, scheduling_router,
-              dags_router, deps_router, overview_router, health_router,
-              alerts_router, cache_router):
+    for r in (
+        failures_router,
+        sla_router,
+        tasks_router,
+        scheduling_router,
+        dags_router,
+        deps_router,
+        overview_router,
+        health_router,
+        alerts_router,
+        cache_router,
+    ):
         v1.include_router(r)
     app.include_router(v1)
 
@@ -115,6 +157,7 @@ def _build_load_test_app():
 def load_client():
     """Module-scoped client for load tests (avoids setup overhead per test)."""
     from airflow_watcher.utils.cache import MetricsCache
+
     MetricsCache.get_instance().clear()
 
     app, patches = _build_load_test_app()
@@ -126,6 +169,7 @@ def load_client():
 # ---------------------------------------------------------------------------
 # Helper: run N requests and collect latencies
 # ---------------------------------------------------------------------------
+
 
 def _run_requests(client, path, n, params=None, headers=None):
     """Send *n* sequential GET requests, return list of latencies in seconds."""
@@ -179,6 +223,7 @@ def _percentile(data, p):
 # THROUGHPUT TESTS
 # =====================================================================
 
+
 class TestThroughput:
     """Measure requests/sec on key endpoints."""
 
@@ -207,6 +252,7 @@ class TestThroughput:
 # LATENCY TESTS
 # =====================================================================
 
+
 class TestLatency:
     """Ensure p95 latency stays below acceptable thresholds."""
 
@@ -215,22 +261,23 @@ class TestLatency:
     def test_failures_p95_under_100ms(self, load_client):
         lats, _ = _run_requests(load_client, "/api/v1/failures/", self.N)
         p95 = _percentile(lats, 95)
-        assert p95 < 0.1, f"p95={p95*1000:.1f}ms exceeds 100ms"
+        assert p95 < 0.1, f"p95={p95 * 1000:.1f}ms exceeds 100ms"
 
     def test_health_p95_under_100ms(self, load_client):
         lats, _ = _run_requests(load_client, "/api/v1/health/", self.N)
         p95 = _percentile(lats, 95)
-        assert p95 < 0.1, f"p95={p95*1000:.1f}ms exceeds 100ms"
+        assert p95 < 0.1, f"p95={p95 * 1000:.1f}ms exceeds 100ms"
 
     def test_scheduling_lag_p99_under_200ms(self, load_client):
         lats, _ = _run_requests(load_client, "/api/v1/scheduling/lag", self.N)
         p99 = _percentile(lats, 99)
-        assert p99 < 0.2, f"p99={p99*1000:.1f}ms exceeds 200ms"
+        assert p99 < 0.2, f"p99={p99 * 1000:.1f}ms exceeds 200ms"
 
 
 # =====================================================================
 # CONCURRENCY TESTS
 # =====================================================================
+
 
 class TestConcurrency:
     """Verify the API handles concurrent requests without errors."""
@@ -271,8 +318,9 @@ class TestConcurrency:
 
 
 # =====================================================================
-# CACHE EFFECTIVENESS  
+# CACHE EFFECTIVENESS
 # =====================================================================
+
 
 class TestCacheEffectiveness:
     """Verify cache reduces latency on repeated requests."""
@@ -280,6 +328,7 @@ class TestCacheEffectiveness:
     def test_second_request_faster(self, load_client):
         """First request computes; second should be cached and faster."""
         from airflow_watcher.utils.cache import MetricsCache
+
         MetricsCache.get_instance().clear()
 
         # First (cold)
@@ -296,7 +345,9 @@ class TestCacheEffectiveness:
 
         warm_median = statistics.median(warm_lats)
         # Cached should generally be faster. Allow generous tolerance for CI noise.
-        assert warm_median <= cold * 2, f"Cached ({warm_median*1000:.1f}ms) not faster than cold ({cold*1000:.1f}ms)"
+        assert warm_median <= cold * 2, (
+            f"Cached ({warm_median * 1000:.1f}ms) not faster than cold ({cold * 1000:.1f}ms)"
+        )
 
     def test_cache_invalidate_resets(self, load_client):
         """After invalidation, next request should recompute."""
@@ -312,6 +363,7 @@ class TestCacheEffectiveness:
 # =====================================================================
 # ERROR RATE UNDER SUSTAINED LOAD
 # =====================================================================
+
 
 class TestErrorRateUnderLoad:
     """Zero 5xx errors under sustained mixed-endpoint load."""
@@ -343,6 +395,7 @@ class TestErrorRateUnderLoad:
 # =====================================================================
 # RESPONSE SIZE SANITY
 # =====================================================================
+
 
 class TestResponseSize:
     """Ensure responses don't blow up unexpectedly."""

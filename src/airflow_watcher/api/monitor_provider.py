@@ -33,6 +33,7 @@ def get_failure_monitor():
         with _lock:
             if _failure_monitor is None:
                 from airflow_watcher.monitors.dag_failure_monitor import DAGFailureMonitor
+
                 _failure_monitor = DAGFailureMonitor(config=_get_config())
     return _failure_monitor
 
@@ -43,6 +44,7 @@ def get_sla_monitor():
         with _lock:
             if _sla_monitor is None:
                 from airflow_watcher.monitors.sla_monitor import SLAMonitor
+
                 _sla_monitor = SLAMonitor(config=_get_config())
     return _sla_monitor
 
@@ -53,6 +55,7 @@ def get_task_monitor():
         with _lock:
             if _task_monitor is None:
                 from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
+
                 _task_monitor = TaskHealthMonitor(config=_get_config())
     return _task_monitor
 
@@ -63,6 +66,7 @@ def get_scheduling_monitor():
         with _lock:
             if _scheduling_monitor is None:
                 from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
+
                 _scheduling_monitor = SchedulingMonitor(config=_get_config())
     return _scheduling_monitor
 
@@ -73,6 +77,7 @@ def get_dag_health_monitor():
         with _lock:
             if _dag_health_monitor is None:
                 from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
+
                 _dag_health_monitor = DAGHealthMonitor(config=_get_config())
     return _dag_health_monitor
 
@@ -83,5 +88,6 @@ def get_dependency_monitor():
         with _lock:
             if _dependency_monitor is None:
                 from airflow_watcher.monitors.dependency_monitor import DependencyMonitor
+
                 _dependency_monitor = DependencyMonitor(config=_get_config())
     return _dependency_monitor

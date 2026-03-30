@@ -36,11 +36,13 @@ async def get_failures(
     data = [f.to_dict() for f in failures]
     data = filter_dags(data, allowed)
 
-    return success_response({
-        "failures": data,
-        "count": len(data),
-        "filters": {"dag_id": dag_id, "hours": hours},
-    })
+    return success_response(
+        {
+            "failures": data,
+            "count": len(data),
+            "filters": {"dag_id": dag_id, "hours": hours},
+        }
+    )
 
 
 @router.get("/stats")
@@ -63,7 +65,5 @@ async def get_failure_stats(
     stats = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     # Filter per-DAG breakdowns
     if allowed is not None and "most_failing_dags" in stats:
-        stats = {**stats, "most_failing_dags": [
-            d for d in stats["most_failing_dags"] if d.get("dag_id") in allowed
-        ]}
+        stats = {**stats, "most_failing_dags": [d for d in stats["most_failing_dags"] if d.get("dag_id") in allowed]}
     return success_response(stats)

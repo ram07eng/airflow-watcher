@@ -22,10 +22,10 @@ from fastapi.testclient import TestClient
 from airflow_watcher.api.auth import configure_auth
 from airflow_watcher.api.rbac_dep import configure_rbac
 
-
 # ---------------------------------------------------------------------------
 # Shared test app builder
 # ---------------------------------------------------------------------------
+
 
 def _build_secure_test_app(api_keys=None, rbac_enabled=False, rbac_mapping=None):
     """Build a test app with monitors mocked and optional auth/RBAC."""
@@ -44,52 +44,81 @@ def _build_secure_test_app(api_keys=None, rbac_enabled=False, rbac_mapping=None)
         p.start()
         return mock_inst
 
-    _mock_provider("airflow_watcher.api.routers.failures.get_failure_monitor", {
-        "get_recent_failures": [],
-        "get_failure_statistics": {"total_runs": 10},
-    })
-    _mock_provider("airflow_watcher.api.routers.sla.get_sla_monitor", {
-        "get_recent_sla_misses": [],
-        "get_sla_statistics": {"total_misses": 0},
-    })
-    _mock_provider("airflow_watcher.api.routers.tasks.get_task_monitor", {
-        "get_long_running_tasks": [],
-        "get_retry_heavy_tasks": [],
-        "get_zombie_tasks": [],
-        "get_task_failure_patterns": {"total_failures": 0},
-    })
-    _mock_provider("airflow_watcher.api.routers.scheduling.get_scheduling_monitor", {
-        "get_scheduling_lag": {},
-        "get_queued_tasks": {},
-        "get_pool_utilization": [],
-        "get_stale_dags": [],
-        "get_concurrent_runs": [],
-    })
-    _mock_provider("airflow_watcher.api.routers.dags.get_dag_health_monitor", {
-        "get_dag_import_errors": [],
-        "get_dag_status_summary": {"total_dags": 50, "health_score": 95},
-        "get_dag_complexity_analysis": [],
-        "get_inactive_dags": [],
-    })
-    _mock_provider("airflow_watcher.api.routers.dependencies.get_dependency_monitor", {
-        "get_upstream_failures": [],
-        "get_cross_dag_dependencies": [],
-        "get_failure_correlation": {"correlations": []},
-        "get_cascading_failure_impact": {
-            "impacted": 2,
-            "downstream_tasks": [
-                {"dag_id": "allowed_dag", "task_id": "t1"},
-                {"dag_id": "secret_dag", "task_id": "t2"},
-            ],
+    _mock_provider(
+        "airflow_watcher.api.routers.failures.get_failure_monitor",
+        {
+            "get_recent_failures": [],
+            "get_failure_statistics": {"total_runs": 10},
         },
-    })
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.sla.get_sla_monitor",
+        {
+            "get_recent_sla_misses": [],
+            "get_sla_statistics": {"total_misses": 0},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.tasks.get_task_monitor",
+        {
+            "get_long_running_tasks": [],
+            "get_retry_heavy_tasks": [],
+            "get_zombie_tasks": [],
+            "get_task_failure_patterns": {"total_failures": 0},
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.scheduling.get_scheduling_monitor",
+        {
+            "get_scheduling_lag": {},
+            "get_queued_tasks": {},
+            "get_pool_utilization": [],
+            "get_stale_dags": [],
+            "get_concurrent_runs": [],
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.dags.get_dag_health_monitor",
+        {
+            "get_dag_import_errors": [],
+            "get_dag_status_summary": {"total_dags": 50, "health_score": 95},
+            "get_dag_complexity_analysis": [],
+            "get_inactive_dags": [],
+        },
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.dependencies.get_dependency_monitor",
+        {
+            "get_upstream_failures": [],
+            "get_cross_dag_dependencies": [],
+            "get_failure_correlation": {"correlations": []},
+            "get_cascading_failure_impact": {
+                "impacted": 2,
+                "downstream_tasks": [
+                    {"dag_id": "allowed_dag", "task_id": "t1"},
+                    {"dag_id": "secret_dag", "task_id": "t2"},
+                ],
+            },
+        },
+    )
     _mock_provider("airflow_watcher.api.routers.overview.get_failure_monitor", {"get_failure_statistics": {}})
     _mock_provider("airflow_watcher.api.routers.overview.get_sla_monitor", {"get_sla_statistics": {}})
-    _mock_provider("airflow_watcher.api.routers.overview.get_task_monitor", {"get_long_running_tasks": [], "get_zombie_tasks": []})
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_task_monitor", {"get_long_running_tasks": [], "get_zombie_tasks": []}
+    )
     _mock_provider("airflow_watcher.api.routers.overview.get_scheduling_monitor", {"get_queued_tasks": {}})
-    _mock_provider("airflow_watcher.api.routers.overview.get_dag_health_monitor", {"get_dag_status_summary": {}, "get_dag_import_errors": []})
-    _mock_provider("airflow_watcher.api.routers.health.get_dag_health_monitor", {"get_dag_status_summary": {"health_score": 95}, "get_dag_import_errors": []})
-    _mock_provider("airflow_watcher.api.routers.health.get_failure_monitor", {"get_dag_health_status": {"summary": {}}, "get_recent_failures": []})
+    _mock_provider(
+        "airflow_watcher.api.routers.overview.get_dag_health_monitor",
+        {"get_dag_status_summary": {}, "get_dag_import_errors": []},
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.health.get_dag_health_monitor",
+        {"get_dag_status_summary": {"health_score": 95}, "get_dag_import_errors": []},
+    )
+    _mock_provider(
+        "airflow_watcher.api.routers.health.get_failure_monitor",
+        {"get_dag_health_status": {"summary": {}}, "get_recent_failures": []},
+    )
     _mock_provider("airflow_watcher.api.routers.health.get_sla_monitor", {"get_recent_sla_misses": []})
 
     # Prevent 501 on DagBag-dependent endpoints in test mode.
@@ -110,9 +139,18 @@ def _build_secure_test_app(api_keys=None, rbac_enabled=False, rbac_mapping=None)
 
     app = FastAPI()
     v1 = APIRouter(prefix="/api/v1")
-    for r in (failures_router, sla_router, tasks_router, scheduling_router,
-              dags_router, deps_router, overview_router, health_router,
-              alerts_router, cache_router):
+    for r in (
+        failures_router,
+        sla_router,
+        tasks_router,
+        scheduling_router,
+        dags_router,
+        deps_router,
+        overview_router,
+        health_router,
+        alerts_router,
+        cache_router,
+    ):
         v1.include_router(r)
     app.include_router(v1)
 
@@ -123,6 +161,7 @@ def _build_secure_test_app(api_keys=None, rbac_enabled=False, rbac_mapping=None)
 def secure_client():
     """App with auth enabled (key='sec-key')."""
     from airflow_watcher.utils.cache import MetricsCache
+
     MetricsCache.get_instance().clear()
 
     app, patches = _build_secure_test_app(api_keys=["sec-key"])
@@ -135,6 +174,7 @@ def secure_client():
 def open_client():
     """App with auth disabled."""
     from airflow_watcher.utils.cache import MetricsCache
+
     MetricsCache.get_instance().clear()
 
     app, patches = _build_secure_test_app()
@@ -147,6 +187,7 @@ def open_client():
 def rbac_client():
     """App with RBAC enabled — key maps to only 'allowed_dag'."""
     from airflow_watcher.utils.cache import MetricsCache
+
     MetricsCache.get_instance().clear()
 
     app, patches = _build_secure_test_app(
@@ -167,6 +208,7 @@ RBAC_AUTH = {"Authorization": "Bearer rbac-key"}
 # 1. SQL INJECTION TESTS
 # =====================================================================
 
+
 class TestSQLInjection:
     """Verify that SQL injection payloads in query/path params are handled safely."""
 
@@ -179,7 +221,7 @@ class TestSQLInjection:
         "admin'--",
         "1' AND SLEEP(5)--",
         "{{7*7}}",  # SSTI
-        "${7*7}",   # Template injection
+        "${7*7}",  # Template injection
     ]
 
     @pytest.mark.parametrize("payload", PAYLOADS)
@@ -208,6 +250,7 @@ class TestSQLInjection:
 # =====================================================================
 # 2. AUTHENTICATION BYPASS TESTS
 # =====================================================================
+
 
 class TestAuthBypass:
     """Attempt to bypass authentication."""
@@ -239,6 +282,7 @@ class TestAuthBypass:
         which is itself a security win — the attack never reaches our auth code.
         """
         import httpx
+
         with pytest.raises((UnicodeEncodeError, httpx.InvalidURL)):
             secure_client.get("/api/v1/failures/", headers={"Authorization": "Bearer s\u0435c-key"})
 
@@ -269,6 +313,7 @@ class TestAuthBypass:
 # 3. TIMING ATTACK RESISTANCE
 # =====================================================================
 
+
 class TestTimingAttack:
     """Verify constant-time comparison doesn't leak valid key prefixes."""
 
@@ -279,6 +324,7 @@ class TestTimingAttack:
         wrong key vs a partially correct key and check they're in the same
         ballpark (within 3x).  Not a guarantee but a good regression signal.
         """
+
         def _measure(token, n=50):
             times = []
             for _ in range(n):
@@ -300,6 +346,7 @@ class TestTimingAttack:
 # 4. HEADER INJECTION
 # =====================================================================
 
+
 class TestHeaderInjection:
     """Verify response headers can't be injected with CRLF."""
 
@@ -319,6 +366,7 @@ class TestHeaderInjection:
 # =====================================================================
 # 5. INPUT VALIDATION / DoS VECTORS
 # =====================================================================
+
 
 class TestInputValidation:
     """Verify bounds enforcement on query parameters."""
@@ -362,6 +410,7 @@ class TestInputValidation:
         our validation layer — either outcome is acceptable.
         """
         import httpx
+
         try:
             resp = open_client.get("/api/v1/failures/", params={"dag_id": "A" * 1_000_000})
             assert resp.status_code == 422
@@ -372,6 +421,7 @@ class TestInputValidation:
 # =====================================================================
 # 6. INFORMATION LEAKAGE
 # =====================================================================
+
 
 class TestInformationLeakage:
     """Ensure no internal details leak in error responses."""
@@ -399,6 +449,7 @@ class TestInformationLeakage:
 # =====================================================================
 # 7. RBAC BYPASS / CROSS-DAG LEAKAGE
 # =====================================================================
+
 
 class TestRBACBypass:
     """Verify RBAC can't be circumvented to leak forbidden DAG data."""
@@ -434,6 +485,7 @@ class TestRBACBypass:
 # 8. CACHE POISONING
 # =====================================================================
 
+
 class TestCachePoisoning:
     """Ensure attacker-controlled params don't exhaust cache memory."""
 
@@ -452,6 +504,7 @@ class TestCachePoisoning:
 # =====================================================================
 # 9. PATH TRAVERSAL
 # =====================================================================
+
 
 class TestPathTraversal:
     """Ensure path params can't escape the intended scope."""
@@ -475,6 +528,7 @@ class TestPathTraversal:
 # =====================================================================
 # 10. PARAMETER POLLUTION
 # =====================================================================
+
 
 class TestParameterPollution:
     """Test behavior with duplicate or conflicting query params."""

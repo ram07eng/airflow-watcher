@@ -35,9 +35,7 @@ async def get_scheduling_lag(
 
     data = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     if allowed is not None and "delayed_dags" in data:
-        data = {**data, "delayed_dags": [
-            d for d in data["delayed_dags"] if d.get("dag_id") in allowed
-        ]}
+        data = {**data, "delayed_dags": [d for d in data["delayed_dags"] if d.get("dag_id") in allowed]}
     return success_response(data)
 
 
@@ -77,10 +75,12 @@ async def get_pool_utilization(
         return get_scheduling_monitor().get_pool_utilization()
 
     pools = await asyncio.to_thread(cache.get_or_compute, "scheduling:pools", _compute)
-    return success_response({
-        "pools": pools,
-        "count": len(pools),
-    })
+    return success_response(
+        {
+            "pools": pools,
+            "count": len(pools),
+        }
+    )
 
 
 @router.get("/stale-dags")
@@ -99,10 +99,12 @@ async def get_stale_dags(
     stale = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     stale = filter_dags(stale, allowed)
 
-    return success_response({
-        "stale_dags": stale,
-        "count": len(stale),
-    })
+    return success_response(
+        {
+            "stale_dags": stale,
+            "count": len(stale),
+        }
+    )
 
 
 @router.get("/concurrent")
@@ -120,9 +122,7 @@ async def get_concurrent_runs(
     if allowed is not None:
         filtered = dict(data)
         if isinstance(filtered.get("concurrent_dags"), list):
-            filtered["concurrent_dags"] = [
-                d for d in filtered["concurrent_dags"] if d.get("dag_id") in allowed
-            ]
+            filtered["concurrent_dags"] = [d for d in filtered["concurrent_dags"] if d.get("dag_id") in allowed]
             filtered["dags_with_concurrent_runs"] = len(filtered["concurrent_dags"])
     else:
         filtered = data

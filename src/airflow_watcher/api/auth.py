@@ -19,10 +19,7 @@ def configure_auth(api_keys: list[str]) -> None:
     global _api_keys
     _api_keys = list(api_keys)
     if not _api_keys:
-        logger.warning(
-            "API_KEYS not configured — authentication is DISABLED. "
-            "Set AIRFLOW_WATCHER_API_KEYS to enable."
-        )
+        logger.warning("API_KEYS not configured — authentication is DISABLED. Set AIRFLOW_WATCHER_API_KEYS to enable.")
 
 
 async def require_auth(request: Request) -> Optional[str]:

@@ -36,11 +36,13 @@ async def get_sla_misses(
     data = [m.to_dict() for m in misses]
     data = filter_dags(data, allowed)
 
-    return success_response({
-        "sla_misses": data,
-        "count": len(data),
-        "filters": {"dag_id": dag_id, "hours": hours},
-    })
+    return success_response(
+        {
+            "sla_misses": data,
+            "count": len(data),
+            "filters": {"dag_id": dag_id, "hours": hours},
+        }
+    )
 
 
 @router.get("/stats")

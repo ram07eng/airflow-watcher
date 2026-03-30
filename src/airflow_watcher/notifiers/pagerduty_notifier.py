@@ -1,21 +1,21 @@
 """PagerDuty Notifier for Airflow Watcher alerts."""
 
-import logging
 import hashlib
-from typing import Optional, Dict, Any, List
+import logging
+from typing import Any, Dict, List, Optional
 
 try:
     import requests
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
 
 from airflow.utils import timezone
 
+from airflow_watcher.config import WatcherConfig
 from airflow_watcher.models.failure import DAGFailure
 from airflow_watcher.models.sla import SLAMissEvent
-from airflow_watcher.config import WatcherConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -277,7 +277,7 @@ class PagerDutyNotifier:
                 headers={"Content-Type": "application/json"},
                 timeout=30,
             )
-            return response.status_code == 202
+            return bool(response.status_code == 202)
         except Exception as e:
             logger.error(f"Failed to resolve PagerDuty alert: {e}")
             return False
@@ -294,4 +294,3 @@ class PagerDutyNotifier:
             source=self.service_name,
             dedup_key=self._generate_dedup_key("test", "airflow-watcher"),
         )
-
