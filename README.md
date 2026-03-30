@@ -99,7 +99,7 @@ The plugin runs **inside** the Airflow webserver process. Once installed, it aut
 
 ## Demo
 
-![Airflow Watcher Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/demo_new.gif)
+![Airflow Watcher Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/images/demo_new.gif)
 
 <details>
 <summary><h2>Plugin Architecture</h2></summary>
@@ -203,6 +203,20 @@ Then create matching roles in Airflow (Admin → Security → List Roles) and as
 | Dependencies | Cross-DAG deps, correlations — filtered |
 | All `/api/watcher` endpoints | Same RBAC enforcement as UI pages |
 
+### RBAC Demo
+
+**Admin** — sees all DAGs:
+
+![Admin RBAC Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/images/rbac_admin.gif)
+
+**Weather user** — sees only weather & stock DAGs:
+
+![Weather User RBAC Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/images/rbac_weather.gif)
+
+**Ecommerce user** — sees only ecommerce & data quality DAGs:
+
+![Ecommerce User RBAC Demo](https://raw.githubusercontent.com/ram07eng/airflow-watcher/main/docs/images/rbac_ecommerce.gif)
+
 </details>
 
 <details>
@@ -304,6 +318,8 @@ See [demo/README.md](demo/README.md) for more details.
 
 A lightweight, standalone REST API that runs **outside** the Airflow webserver. Use this when you want to call monitoring endpoints from external services, dashboards, or CI/CD pipelines without adding load to the Airflow webserver.
 
+📖 **[Interactive API Docs (Swagger UI)](https://ram07eng.github.io/airflow-watcher/)** — browse all 28 endpoints without running the server.
+
 <details>
 <summary><h2>API Architecture</h2></summary>
 
@@ -371,7 +387,9 @@ curl -H "Authorization: Bearer your-secret-api-key-here" \
 
 ### Interactive API Docs
 
-Once running, open **http://localhost:8081/docs** for the full Swagger UI where you can try every endpoint interactively.
+📖 **Browse the full API spec online: [Airflow Watcher API Docs](https://ram07eng.github.io/airflow-watcher/)** (Swagger UI — no server required)
+
+When running locally, the same docs are available at **http://localhost:8081/docs**.
 
 ## Authentication
 
