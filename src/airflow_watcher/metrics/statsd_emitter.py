@@ -1,21 +1,16 @@
 """StatsD Emitter - Sends metrics to StatsD/Datadog."""
 
-from __future__ import annotations
-
 import logging
+import threading
+from typing import Optional, Dict, Any, List
 import socket
-from typing import TYPE_CHECKING, Dict, Optional
-
-if TYPE_CHECKING:
-    from airflow_watcher.config import WatcherConfig
-    from airflow_watcher.metrics.collector import WatcherMetrics
 
 logger = logging.getLogger(__name__)
 
 
 class StatsDEmitter:
     """Emits metrics to StatsD or DogStatsD (Datadog)."""
-
+    
     def __init__(
         self,
         host: str = "localhost",
@@ -25,7 +20,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ):
         """Initialize StatsD emitter.
-
+        
         Args:
             host: StatsD server hostname
             port: StatsD server port
@@ -40,34 +35,44 @@ class StatsDEmitter:
         self.default_tags = tags or {}
         self._socket: Optional[socket.socket] = None
         self._enabled = True
-
+        self._lock = threading.Lock()
+        
     def _get_socket(self) -> socket.socket:
-        """Get or create UDP socket."""
+        """Get or create UDP socket (caller must hold ``_lock``)."""
         if self._socket is None:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         return self._socket
+    
+    @staticmethod
+    def _sanitize_tag(value: str) -> str:
+        """Sanitize a DogStatsD tag key or value by replacing delimiters."""
+        return value.replace(",", "_").replace(":", "_").replace("|", "_")
 
     def _format_tags(self, tags: Optional[Dict[str, str]] = None) -> str:
         """Format tags for DogStatsD."""
         all_tags = {**self.default_tags, **(tags or {})}
         if not all_tags or not self.use_dogstatsd:
             return ""
-        tag_str = ",".join(f"{k}:{v}" for k, v in all_tags.items())
+        tag_str = ",".join(
+            f"{self._sanitize_tag(str(k))}:{self._sanitize_tag(str(v))}"
+            for k, v in all_tags.items()
+        )
         return f"|#{tag_str}"
-
+    
     def _send(self, data: str) -> bool:
-        """Send data to StatsD server."""
+        """Send data to StatsD server (thread-safe)."""
         if not self._enabled:
             return False
-
+            
         try:
-            sock = self._get_socket()
-            sock.sendto(data.encode(), (self.host, self.port))
+            with self._lock:
+                sock = self._get_socket()
+                sock.sendto(data.encode(), (self.host, self.port))
             return True
         except Exception as e:
             logger.warning(f"Failed to send to StatsD: {e}")
             return False
-
+    
     def gauge(
         self,
         name: str,
@@ -75,7 +80,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Send a gauge metric.
-
+        
         Args:
             name: Metric name
             value: Metric value
@@ -85,7 +90,7 @@ class StatsDEmitter:
         tag_str = self._format_tags(tags)
         data = f"{metric_name}:{value}|g{tag_str}"
         return self._send(data)
-
+    
     def counter(
         self,
         name: str,
@@ -93,7 +98,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Send a counter metric.
-
+        
         Args:
             name: Metric name
             value: Increment value (default 1)
@@ -103,7 +108,7 @@ class StatsDEmitter:
         tag_str = self._format_tags(tags)
         data = f"{metric_name}:{value}|c{tag_str}"
         return self._send(data)
-
+    
     def timing(
         self,
         name: str,
@@ -111,7 +116,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Send a timing metric.
-
+        
         Args:
             name: Metric name
             value_ms: Duration in milliseconds
@@ -121,7 +126,7 @@ class StatsDEmitter:
         tag_str = self._format_tags(tags)
         data = f"{metric_name}:{value_ms}|ms{tag_str}"
         return self._send(data)
-
+    
     def histogram(
         self,
         name: str,
@@ -129,7 +134,7 @@ class StatsDEmitter:
         tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Send a histogram metric (DogStatsD only).
-
+        
         Args:
             name: Metric name
             value: Metric value
@@ -138,50 +143,52 @@ class StatsDEmitter:
         if not self.use_dogstatsd:
             # Fall back to timing for standard StatsD
             return self.timing(name, value, tags)
-
+            
         metric_name = f"{self.prefix}.{name}"
         tag_str = self._format_tags(tags)
         data = f"{metric_name}:{value}|h{tag_str}"
         return self._send(data)
-
+    
     def emit_watcher_metrics(self, metrics: "WatcherMetrics") -> Dict[str, bool]:
         """Emit all Watcher metrics.
-
+        
         Args:
             metrics: WatcherMetrics object
-
+            
         Returns:
             Dict of metric names to success status
         """
-
+        from airflow_watcher.metrics.collector import WatcherMetrics
+        
         results = {}
         for name, value in metrics.to_dict().items():
             if isinstance(value, (int, float)):
                 results[name] = self.gauge(name, value)
-
+        
         return results
-
+    
     def close(self):
-        """Close the socket connection."""
-        if self._socket:
-            self._socket.close()
-            self._socket = None
-
+        """Close the socket connection (thread-safe)."""
+        with self._lock:
+            if self._socket:
+                self._socket.close()
+                self._socket = None
+    
     def disable(self):
         """Disable metric emission."""
         self._enabled = False
-
+    
     def enable(self):
         """Enable metric emission."""
         self._enabled = True
-
+    
     @classmethod
     def from_config(cls, config: "WatcherConfig") -> "StatsDEmitter":
         """Create emitter from WatcherConfig.
-
+        
         Args:
             config: WatcherConfig instance
-
+            
         Returns:
             Configured StatsDEmitter
         """

@@ -5,11 +5,19 @@ access control. Teams only see DAGs they have permission to view.
 """
 
 import logging
+import os
 from typing import Any, Dict, Optional, Set
 
 from flask import has_request_context
 
 logger = logging.getLogger(__name__)
+
+# When True, RBAC failures silently grant full access.
+# Set ``AIRFLOW_WATCHER_RBAC_FAIL_OPEN=true`` to allow access on lookup errors.
+# Default is **closed** — deny access when permissions cannot be resolved.
+RBAC_FAIL_OPEN: bool = os.environ.get("AIRFLOW_WATCHER_RBAC_FAIL_OPEN", "false").lower() in (
+    "true", "1", "yes",
+)
 
 
 def get_current_user() -> Any:
@@ -74,9 +82,16 @@ def get_accessible_dag_ids(user: Any = None) -> Optional[Set[str]]:
             return readable_dags
 
     except Exception:
-        logger.warning("RBAC: Could not resolve DAG permissions, failing open", exc_info=True)
+        logger.warning("RBAC: Could not resolve DAG permissions, failing %s",
+                        "open" if RBAC_FAIL_OPEN else "closed", exc_info=True)
+        if RBAC_FAIL_OPEN:
+            return None  # Fail open — don't break the dashboard
+        return set()  # Fail closed — deny all DAG access
 
-    return None  # Fail open — don't break the dashboard if RBAC lookup fails
+    # RBAC lookup returned None (could not determine permissions)
+    if RBAC_FAIL_OPEN:
+        return None
+    return set()
 
 
 def _is_admin_user(user: Any, security_manager: Any) -> bool:

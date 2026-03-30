@@ -16,6 +16,13 @@ class MetricsCache:
 
     Prevents repeated expensive DB queries on every page load.
     At 4500+ DAGs, uncached queries can take 10-30 seconds each.
+
+    **Fork-safety warning**: The singleton instance and its ``threading.Lock``
+    are **not** safe across ``os.fork()`` boundaries.  Gunicorn (prefork) and
+    Airflow's Celery workers fork after import, which means the lock state
+    may be corrupted in child processes.  In prefork deployments, call
+    ``MetricsCache.reset_instance()`` in a ``post_fork`` hook or rely on
+    per-process initialisation to create a fresh instance.
     """
 
     _instance: Optional["MetricsCache"] = None
@@ -34,6 +41,15 @@ class MetricsCache:
                 if cls._instance is None:
                     cls._instance = cls(default_ttl=default_ttl)
         return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Discard singleton so the next ``get_instance()`` creates a fresh one.
+
+        Call from a ``post_fork`` hook in prefork servers (e.g. Gunicorn).
+        """
+        with cls._lock:
+            cls._instance = None
 
     def get(self, key: str) -> Optional[Any]:
         """Get cached value if not expired."""

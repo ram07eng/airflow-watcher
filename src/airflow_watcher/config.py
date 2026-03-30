@@ -2,14 +2,24 @@
 
 import os
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import List, Optional, Dict
 
 from airflow.configuration import conf
 
 
 @dataclass
 class WatcherConfig:
-    """Configuration settings for Airflow Watcher plugin."""
+    """Configuration settings for Airflow Watcher plugin.
+
+    **Default constructor** — ``WatcherConfig()`` — returns an instance with
+    hard-coded development defaults (e.g. no Slack token, no SMTP, StatsD
+    disabled).  These defaults are safe for local testing but **not**
+    production-ready.
+
+    For production use, prefer ``WatcherConfig.from_airflow_config()`` which
+    reads values from the ``[airflow_watcher]`` section of ``airflow.cfg``
+    (or equivalent env-var overrides).
+    """
 
     # Slack settings
     slack_webhook_url: Optional[str] = None
@@ -35,11 +45,11 @@ class WatcherConfig:
     alert_on_retry_failure: bool = False
     batch_alerts: bool = False
     batch_interval_minutes: int = 15
-
+    
     # PagerDuty settings
     pagerduty_routing_key: Optional[str] = None
     pagerduty_service_name: str = "Airflow Watcher"
-
+    
     # StatsD settings
     statsd_enabled: bool = False
     statsd_host: str = "localhost"
@@ -47,34 +57,32 @@ class WatcherConfig:
     statsd_prefix: str = "airflow.watcher"
     use_dogstatsd: bool = False
     statsd_tags: Dict[str, str] = field(default_factory=dict)
-
+    
     # Prometheus settings
     prometheus_enabled: bool = False
     prometheus_prefix: str = "airflow_watcher"
     prometheus_labels: Dict[str, str] = field(default_factory=dict)
-
+    
     # General settings
     airflow_base_url: str = "http://localhost:8080"
     alert_rules_file: Optional[str] = None
-    alert_template: str = (
-        "production_balanced"  # production_strict, production_balanced, production_relaxed, development
-    )
+    alert_template: str = "production_balanced"  # production_strict, production_balanced, production_relaxed, development
 
     @classmethod
     def from_airflow_config(cls) -> "WatcherConfig":
         """Load configuration from Airflow config.
-
+        
         Returns:
             WatcherConfig instance with values from airflow.cfg
         """
         config = cls()
-
+        
         try:
             # Slack settings
             config.slack_webhook_url = conf.get("airflow_watcher", "slack_webhook_url", fallback=None)
             config.slack_token = conf.get("airflow_watcher", "slack_token", fallback=None)
             config.slack_channel = conf.get("airflow_watcher", "slack_channel", fallback="#airflow-alerts")
-
+            
             # Email settings
             config.smtp_host = conf.get("airflow_watcher", "smtp_host", fallback=None)
             config.smtp_port = conf.getint("airflow_watcher", "smtp_port", fallback=587)
@@ -82,30 +90,28 @@ class WatcherConfig:
             config.smtp_user = conf.get("airflow_watcher", "smtp_user", fallback=None)
             config.smtp_password = conf.get("airflow_watcher", "smtp_password", fallback=None)
             config.email_from = conf.get("airflow_watcher", "email_from", fallback="airflow-watcher@example.com")
-
+            
             recipients_str = conf.get("airflow_watcher", "email_recipients", fallback="")
             config.email_recipients = [r.strip() for r in recipients_str.split(",") if r.strip()]
-
+            
             # Monitoring settings
             config.failure_lookback_hours = conf.getint("airflow_watcher", "failure_lookback_hours", fallback=24)
             config.sla_check_interval_minutes = conf.getint("airflow_watcher", "sla_check_interval_minutes", fallback=5)
-            config.sla_warning_threshold_minutes = conf.getint(
-                "airflow_watcher", "sla_warning_threshold_minutes", fallback=30
-            )
-
+            config.sla_warning_threshold_minutes = conf.getint("airflow_watcher", "sla_warning_threshold_minutes", fallback=30)
+            
             # Alert settings
             config.alert_on_first_failure = conf.getboolean("airflow_watcher", "alert_on_first_failure", fallback=True)
             config.alert_on_retry_failure = conf.getboolean("airflow_watcher", "alert_on_retry_failure", fallback=False)
             config.batch_alerts = conf.getboolean("airflow_watcher", "batch_alerts", fallback=False)
             config.batch_interval_minutes = conf.getint("airflow_watcher", "batch_interval_minutes", fallback=15)
-
+            
         except Exception:
             # If airflow_watcher section doesn't exist, use defaults
-            pass
-
+            logger.debug("Could not load [airflow_watcher] config section, using defaults")
+        
         # Override with environment variables
         config._load_from_env()
-
+        
         return config
 
     def _load_from_env(self) -> None:
@@ -139,12 +145,15 @@ class WatcherConfig:
             "AIRFLOW_WATCHER_ALERT_RULES_FILE": "alert_rules_file",
             "AIRFLOW_WATCHER_ALERT_TEMPLATE": "alert_template",
         }
-
+        
         for env_var, attr in env_mappings.items():
             value = os.environ.get(env_var)
             if value is not None:
                 if attr in ("smtp_port", "statsd_port"):
-                    setattr(self, attr, int(value))
+                    port = int(value)
+                    if not (1 <= port <= 65535):
+                        raise ValueError(f"Port {value} out of range (1-65535) for {env_var}")
+                    setattr(self, attr, port)
                 elif attr == "email_recipients":
                     setattr(self, attr, [r.strip() for r in value.split(",") if r.strip()])
                 elif attr in ("statsd_enabled", "use_dogstatsd", "prometheus_enabled"):
