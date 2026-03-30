@@ -70,23 +70,44 @@ Once Airflow is running, navigate to the **"Watcher"** menu in the top navigatio
 
 ## API Endpoints
 
-Test the REST API:
+Test the REST API (all endpoints are under `/api/watcher` on the Airflow webserver):
 
 ```bash
-# Health check
+# Health & Overview
 curl http://localhost:8080/api/watcher/health
+curl http://localhost:8080/api/watcher/overview
 
-# Recent failures
+# Failures
 curl http://localhost:8080/api/watcher/failures
+curl http://localhost:8080/api/watcher/failures/stats
 
-# SLA misses
+# SLA
 curl http://localhost:8080/api/watcher/sla/misses
+curl http://localhost:8080/api/watcher/sla/stats
 
-# Task health
+# Tasks
 curl http://localhost:8080/api/watcher/tasks/long-running
+curl http://localhost:8080/api/watcher/tasks/retries
+curl http://localhost:8080/api/watcher/tasks/zombies
+curl http://localhost:8080/api/watcher/tasks/failure-patterns
 
-# Scheduling status
+# Scheduling
 curl http://localhost:8080/api/watcher/scheduling/lag
+curl http://localhost:8080/api/watcher/scheduling/queue
+curl http://localhost:8080/api/watcher/scheduling/pools
+curl http://localhost:8080/api/watcher/scheduling/stale-dags
+curl http://localhost:8080/api/watcher/scheduling/concurrent
+
+# DAGs
+curl http://localhost:8080/api/watcher/dags/import-errors
+curl http://localhost:8080/api/watcher/dags/status-summary
+curl http://localhost:8080/api/watcher/dags/complexity
+curl http://localhost:8080/api/watcher/dags/inactive
+
+# Dependencies
+curl http://localhost:8080/api/watcher/dependencies/upstream-failures
+curl http://localhost:8080/api/watcher/dependencies/cross-dag
+curl http://localhost:8080/api/watcher/dependencies/correlations
 ```
 
 ## Triggering Test Failures

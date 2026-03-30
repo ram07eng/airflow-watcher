@@ -179,6 +179,39 @@ docker-compose up -d
 
 Everything runs inside the Airflow webserver process. No separate workers, no message queues, no external databases. The plugin reads from the same metadata DB that Airflow already maintains.
 
+### Plugin API Endpoints — `/api/watcher`
+
+The plugin exposes a REST API at `/api/watcher/*` on the Airflow webserver.
+Authentication uses Airflow session cookies (same login as the UI).
+All endpoints return JSON with a standard `{status, data, timestamp}` envelope.
+
+| Category | Method | Path | Description |
+|----------|--------|------|-------------|
+| **Failures** | GET | `/api/watcher/failures` | Recent DAG failures |
+| | GET | `/api/watcher/failures/stats` | Failure rate statistics |
+| **SLA** | GET | `/api/watcher/sla/misses` | SLA miss events |
+| | GET | `/api/watcher/sla/stats` | SLA miss statistics |
+| **Health** | GET | `/api/watcher/health` | System health (200/503) |
+| | GET | `/api/watcher/health/<dag_id>` | Per-DAG health |
+| **Tasks** | GET | `/api/watcher/tasks/long-running` | Tasks exceeding threshold |
+| | GET | `/api/watcher/tasks/retries` | Tasks with excessive retries |
+| | GET | `/api/watcher/tasks/zombies` | Potential zombie tasks |
+| | GET | `/api/watcher/tasks/failure-patterns` | Failure pattern analysis |
+| **Scheduling** | GET | `/api/watcher/scheduling/lag` | Scheduling delay percentiles |
+| | GET | `/api/watcher/scheduling/queue` | Current queue status |
+| | GET | `/api/watcher/scheduling/pools` | Pool utilization |
+| | GET | `/api/watcher/scheduling/stale-dags` | DAGs not running on schedule |
+| | GET | `/api/watcher/scheduling/concurrent` | Concurrent DAG runs |
+| **DAGs** | GET | `/api/watcher/dags/import-errors` | DAG import errors |
+| | GET | `/api/watcher/dags/status-summary` | Status summary with health score |
+| | GET | `/api/watcher/dags/complexity` | DAG complexity analysis |
+| | GET | `/api/watcher/dags/inactive` | Inactive DAGs |
+| **Dependencies** | GET | `/api/watcher/dependencies/upstream-failures` | Upstream failure cascades |
+| | GET | `/api/watcher/dependencies/cross-dag` | Cross-DAG dependencies |
+| | GET | `/api/watcher/dependencies/correlations` | Failure correlations |
+| | GET | `/api/watcher/dependencies/impact/<dag_id>/<task_id>` | Downstream impact |
+| **Overview** | GET | `/api/watcher/overview` | Combined overview |
+
 ## Project Structure
 
 ```
@@ -190,12 +223,18 @@ airflow-watcher/
 │       ├── views/             # Flask Blueprint views
 │       ├── monitors/          # DAG & SLA monitoring logic
 │       ├── notifiers/         # Slack, email notifications
-│       └── templates/         # Jinja2 templates
+│       ├── templates/         # Jinja2 templates
+│       └── api/               # Standalone FastAPI service
 ├── demo/                      # Local demo Airflow environment
 │   ├── dags/                  # Sample DAGs for testing
 │   ├── plugins/               # Plugin copy for demo
 │   └── docker-compose.yml     # Docker setup
-├── tests/
+├── tests/                     # 302 unit tests
+│   └── live/                  # Live integration tests (need Docker)
+│       ├── test_qa_deep.py    # Standalone API deep QA (334 tests)
+│       ├── test_qa_plugin.py  # Plugin API deep QA (138 tests)
+│       └── ...
+├── docs/screenshots/          # Dashboard screenshots
 └── pyproject.toml
 ```
 
@@ -284,8 +323,18 @@ Visit `http://localhost:8080/api/watcher/health` to verify.
 # Install dev dependencies
 pip install -e ".[dev]"
 
-# Run tests
-pytest
+# Unit tests (302 pass)
+pytest tests/ --ignore=tests/live -v --no-cov
+
+# Security & penetration tests only
+pytest tests/test_security.py -v
+
+# Load & stress tests only
+pytest tests/test_load.py -v
+
+# Live integration tests (requires demo Docker environment)
+python tests/live/test_qa_deep.py      # Standalone API deep QA (334 tests)
+python tests/live/test_qa_plugin.py     # Plugin API deep QA (138 tests)
 
 # Run linting
 ruff check src tests

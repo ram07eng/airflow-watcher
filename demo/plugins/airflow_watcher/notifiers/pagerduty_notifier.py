@@ -1,21 +1,21 @@
 """PagerDuty Notifier for Airflow Watcher alerts."""
 
-import hashlib
 import logging
-from typing import Any, Dict, List, Optional
+import hashlib
+from typing import Optional, Dict, Any, List
 
 try:
     import requests
-
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
 
 from airflow.utils import timezone
 
-from airflow_watcher.config import WatcherConfig
 from airflow_watcher.models.failure import DAGFailure
 from airflow_watcher.models.sla import SLAMissEvent
+from airflow_watcher.config import WatcherConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class PagerDutyNotifier:
     def _generate_dedup_key(self, source: str, identifier: str) -> str:
         """Generate a deduplication key for PagerDuty."""
         key_string = f"{source}:{identifier}"
-        return hashlib.md5(key_string.encode()).hexdigest()
+        return hashlib.sha256(key_string.encode()).hexdigest()
 
     def _send_event(
         self,
@@ -294,3 +294,4 @@ class PagerDutyNotifier:
             source=self.service_name,
             dedup_key=self._generate_dedup_key("test", "airflow-watcher"),
         )
+

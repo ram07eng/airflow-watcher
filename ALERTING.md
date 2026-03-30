@@ -158,7 +158,7 @@ export AIRFLOW_WATCHER_PROMETHEUS_PREFIX="airflow_watcher"
 
 The plugin exposes a `/watcher/metrics` endpoint in Prometheus format.
 
-**Prometheus scrape config:**
+**Prometheus scrape config (plugin mode):**
 
 ```yaml
 scrape_configs:
@@ -166,6 +166,35 @@ scrape_configs:
     static_configs:
       - targets: ['airflow-webserver:8080']
     metrics_path: '/watcher/metrics'
+```
+
+**Prometheus scrape config (standalone API mode):**
+
+The standalone FastAPI service exposes metrics at the root `/metrics` path:
+
+```yaml
+scrape_configs:
+  - job_name: 'airflow-watcher-standalone'
+    static_configs:
+      - targets: ['watcher-api:8081']
+    metrics_path: '/metrics'
+```
+
+### Programmatic Alert Evaluation
+
+The standalone API provides endpoints for managing and evaluating alerts programmatically:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/alerts/rules` | List all configured alert rules |
+| POST | `/api/v1/alerts/evaluate` | Evaluate alert rules against current metrics |
+
+```bash
+# List alert rules
+curl -H "Authorization: Bearer <key>" http://localhost:8081/api/v1/alerts/rules
+
+# Trigger alert evaluation
+curl -X POST -H "Authorization: Bearer <key>" http://localhost:8081/api/v1/alerts/evaluate
 ```
 
 ---

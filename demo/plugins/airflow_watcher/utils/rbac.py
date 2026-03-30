@@ -5,14 +5,22 @@ access control. Teams only see DAGs they have permission to view.
 """
 
 import logging
+import os
 from typing import Any, Dict, Optional, Set
 
 from flask import has_request_context
 
 logger = logging.getLogger(__name__)
 
+# When True, RBAC failures silently grant full access.
+# Set ``AIRFLOW_WATCHER_RBAC_FAIL_OPEN=true`` to allow access on lookup errors.
+# Default is **closed** — deny access when permissions cannot be resolved.
+RBAC_FAIL_OPEN: bool = os.environ.get("AIRFLOW_WATCHER_RBAC_FAIL_OPEN", "false").lower() in (
+    "true", "1", "yes",
+)
 
-def get_current_user():
+
+def get_current_user() -> Any:
     """Get the currently authenticated Airflow user.
 
     Returns:
@@ -32,7 +40,7 @@ def get_current_user():
     return None
 
 
-def get_accessible_dag_ids(user=None) -> Optional[Set[str]]:
+def get_accessible_dag_ids(user: Any = None) -> Optional[Set[str]]:
     """Get the set of DAG IDs the current user is allowed to access.
 
     Uses Airflow's security manager to resolve permissions based on the
@@ -56,7 +64,7 @@ def get_accessible_dag_ids(user=None) -> Optional[Set[str]]:
     try:
         from flask import current_app
 
-        sm = current_app.appbuilder.sm
+        sm = current_app.appbuilder.sm  # type: ignore[attr-defined]
 
         # Admin and Op roles can see everything
         if _is_admin_user(user, sm):
@@ -74,12 +82,19 @@ def get_accessible_dag_ids(user=None) -> Optional[Set[str]]:
             return readable_dags
 
     except Exception:
-        logger.warning("RBAC: Could not resolve DAG permissions, failing open", exc_info=True)
+        logger.warning("RBAC: Could not resolve DAG permissions, failing %s",
+                        "open" if RBAC_FAIL_OPEN else "closed", exc_info=True)
+        if RBAC_FAIL_OPEN:
+            return None  # Fail open — don't break the dashboard
+        return set()  # Fail closed — deny all DAG access
 
-    return None  # Fail open — don't break the dashboard if RBAC lookup fails
+    # RBAC lookup returned None (could not determine permissions)
+    if RBAC_FAIL_OPEN:
+        return None
+    return set()
 
 
-def _is_admin_user(user, security_manager) -> bool:
+def _is_admin_user(user: Any, security_manager: Any) -> bool:
     """Check if the user has an admin-level role."""
     try:
         admin_role_names = {"Admin", "Op"}
@@ -89,7 +104,7 @@ def _is_admin_user(user, security_manager) -> bool:
         return False
 
 
-def _get_readable_dag_ids(user, security_manager) -> Optional[Set[str]]:
+def _get_readable_dag_ids(user: Any, security_manager: Any) -> Optional[Set[str]]:
     """Get DAG IDs the user can read, using Airflow's security manager.
 
     Tries multiple approaches for compatibility across Airflow versions.
@@ -112,7 +127,7 @@ def _get_readable_dag_ids(user, security_manager) -> Optional[Set[str]]:
     return None
 
 
-def _resolve_from_permissions(user, security_manager) -> Optional[Set[str]]:
+def _resolve_from_permissions(user: Any, security_manager: Any) -> Optional[Set[str]]:
     """Resolve accessible DAG IDs by inspecting FAB permissions directly."""
     from airflow.security import permissions as perms
 
@@ -123,8 +138,8 @@ def _resolve_from_permissions(user, security_manager) -> Optional[Set[str]]:
         action = permission[0] if isinstance(permission, tuple) else getattr(permission, "action", None)
         resource = permission[1] if isinstance(permission, tuple) else getattr(permission, "resource", None)
 
-        action_name = action.name if hasattr(action, "name") else str(action)
-        resource_name = resource.name if hasattr(resource, "name") else str(resource)
+        action_name = action.name if hasattr(action, "name") else str(action)  # type: ignore[union-attr]
+        resource_name = resource.name if hasattr(resource, "name") else str(resource)  # type: ignore[union-attr]
 
         # DAG-level read permissions look like: can_read on DAG:<dag_id>
         if action_name == perms.ACTION_CAN_READ and resource_name.startswith(perms.RESOURCE_DAG_PREFIX):
@@ -181,7 +196,7 @@ def filter_results_rbac(
     return results
 
 
-def get_rbac_context() -> Dict:
+def get_rbac_context() -> Dict[str, Any]:
     """Get RBAC context for templates.
 
     Returns:
@@ -194,7 +209,7 @@ def get_rbac_context() -> Dict:
     try:
         from flask import current_app
 
-        sm = current_app.appbuilder.sm
+        sm = current_app.appbuilder.sm  # type: ignore[attr-defined]
         is_admin = _is_admin_user(user, sm)
     except Exception:
         is_admin = False

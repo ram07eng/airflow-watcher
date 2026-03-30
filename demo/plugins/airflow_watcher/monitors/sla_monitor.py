@@ -1,19 +1,45 @@
-"""SLA Monitor - Tracks SLA misses and delays."""
+"""SLA Monitor - Tracks SLA misses and delays.
 
-import logging
-from datetime import timedelta
+.. deprecated:: Airflow 3.0
+    The ``sla_miss`` table (``airflow.models.SlaMiss``) was deprecated in
+    Airflow 2.6 and **removed in Airflow 3.0**.  This module gracefully
+    degrades when the model is unavailable, returning empty results instead
+    of crashing.  A future version of airflow-watcher will migrate to
+    Airflow 3.x's Dataset-based event model.
+"""
+
+import warnings
+from datetime import datetime, timedelta
 from typing import List, Optional
-
-from airflow.models import DagRun, SlaMiss
+import logging
 from airflow.utils import timezone
-from airflow.utils.session import provide_session
-from sqlalchemy import func
-from sqlalchemy.orm import Session
 
-from airflow_watcher.config import WatcherConfig
+from airflow.models import DagRun, TaskInstance
+from airflow.utils.session import provide_session
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+
 from airflow_watcher.models.sla import SLAMissEvent
+from airflow_watcher.config import WatcherConfig
+
 
 logger = logging.getLogger(__name__)
+
+# Gracefully handle SlaMiss removal in Airflow 3.0+
+try:
+    from airflow.models import SlaMiss
+
+    _SLA_MISS_AVAILABLE = True
+except ImportError:
+    _SLA_MISS_AVAILABLE = False
+    SlaMiss = None  # type: ignore[assignment,misc]
+    warnings.warn(
+        "airflow.models.SlaMiss is not available (Airflow 3.0+). "
+        "SLA monitoring features will return empty results. "
+        "A future airflow-watcher release will migrate to the Dataset event model.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
 
 class SLAMonitor:
@@ -21,7 +47,7 @@ class SLAMonitor:
 
     def __init__(self, config: Optional[WatcherConfig] = None):
         """Initialize the SLA monitor.
-
+        
         Args:
             config: Optional configuration object. Uses defaults if not provided.
         """
@@ -37,31 +63,34 @@ class SLAMonitor:
         session: Session = None,
     ) -> List[SLAMissEvent]:
         """Get recent SLA misses.
-
+        
         Args:
             dag_id: Optional DAG ID to filter by
             task_id: Optional task ID to filter by
             lookback_hours: Hours to look back for SLA misses
             limit: Maximum number of misses to return
             session: SQLAlchemy session
-
+            
         Returns:
             List of SLAMissEvent objects
         """
-        cutoff_time = timezone.utcnow() - timedelta(hours=lookback_hours)
+        if not _SLA_MISS_AVAILABLE:
+            return []
 
+        cutoff_time = timezone.utcnow() - timedelta(hours=lookback_hours)
+        
         query = session.query(SlaMiss).filter(
             SlaMiss.timestamp >= cutoff_time,
         )
-
+        
         if dag_id:
             query = query.filter(SlaMiss.dag_id == dag_id)
-
+        
         if task_id:
             query = query.filter(SlaMiss.task_id == task_id)
-
+        
         query = query.order_by(SlaMiss.timestamp.desc()).limit(limit)
-
+        
         sla_misses = []
         for sla_miss in query.all():
             event = SLAMissEvent(
@@ -74,7 +103,7 @@ class SLAMonitor:
                 description=sla_miss.description,
             )
             sla_misses.append(event)
-
+        
         return sla_misses
 
     @provide_session
@@ -84,77 +113,78 @@ class SLAMonitor:
         session: Session = None,
     ) -> dict:
         """Get SLA miss statistics for the specified time period.
-
+        
         Args:
             lookback_hours: Hours to look back
             session: SQLAlchemy session
-
+            
         Returns:
             Dictionary with SLA statistics
         """
+        if not _SLA_MISS_AVAILABLE:
+            return {
+                "period_hours": lookback_hours,
+                "total_sla_misses": 0,
+                "notifications_sent": 0,
+                "emails_sent": 0,
+                "top_dags_with_misses": [],
+                "top_tasks_with_misses": [],
+                "message": "SLA monitoring unavailable (SlaMiss model not present in this Airflow version)",
+                "timestamp": timezone.utcnow().isoformat(),
+            }
+
         cutoff_time = timezone.utcnow() - timedelta(hours=lookback_hours)
-
+        
         # Total SLA misses
-        total_misses = (
-            session.query(SlaMiss)
-            .filter(
-                SlaMiss.timestamp >= cutoff_time,
-            )
-            .count()
-        )
-
+        total_misses = session.query(SlaMiss).filter(
+            SlaMiss.timestamp >= cutoff_time,
+        ).count()
+        
         # SLA misses by DAG
-        misses_by_dag = (
-            session.query(SlaMiss.dag_id, func.count(SlaMiss.dag_id).label("miss_count"))
-            .filter(
-                SlaMiss.timestamp >= cutoff_time,
-            )
-            .group_by(SlaMiss.dag_id)
-            .order_by(func.count(SlaMiss.dag_id).desc())
-            .limit(10)
-            .all()
-        )
-
+        misses_by_dag = session.query(
+            SlaMiss.dag_id,
+            func.count(SlaMiss.dag_id).label("miss_count")
+        ).filter(
+            SlaMiss.timestamp >= cutoff_time,
+        ).group_by(SlaMiss.dag_id).order_by(
+            func.count(SlaMiss.dag_id).desc()
+        ).limit(10).all()
+        
         # SLA misses by task
-        misses_by_task = (
-            session.query(SlaMiss.dag_id, SlaMiss.task_id, func.count(SlaMiss.task_id).label("miss_count"))
-            .filter(
-                SlaMiss.timestamp >= cutoff_time,
-            )
-            .group_by(SlaMiss.dag_id, SlaMiss.task_id)
-            .order_by(func.count(SlaMiss.task_id).desc())
-            .limit(10)
-            .all()
-        )
-
+        misses_by_task = session.query(
+            SlaMiss.dag_id,
+            SlaMiss.task_id,
+            func.count(SlaMiss.task_id).label("miss_count")
+        ).filter(
+            SlaMiss.timestamp >= cutoff_time,
+        ).group_by(SlaMiss.dag_id, SlaMiss.task_id).order_by(
+            func.count(SlaMiss.task_id).desc()
+        ).limit(10).all()
+        
         # Notifications sent
-        notifications_sent = (
-            session.query(SlaMiss)
-            .filter(
-                SlaMiss.timestamp >= cutoff_time,
-                SlaMiss.notification_sent,
-            )
-            .count()
-        )
-
+        notifications_sent = session.query(SlaMiss).filter(
+            SlaMiss.timestamp >= cutoff_time,
+            SlaMiss.notification_sent == True,
+        ).count()
+        
         # Emails sent
-        emails_sent = (
-            session.query(SlaMiss)
-            .filter(
-                SlaMiss.timestamp >= cutoff_time,
-                SlaMiss.email_sent,
-            )
-            .count()
-        )
-
+        emails_sent = session.query(SlaMiss).filter(
+            SlaMiss.timestamp >= cutoff_time,
+            SlaMiss.email_sent == True,
+        ).count()
+        
         return {
             "period_hours": lookback_hours,
             "total_sla_misses": total_misses,
             "notifications_sent": notifications_sent,
             "emails_sent": emails_sent,
-            "top_dags_with_misses": [{"dag_id": dag_id, "miss_count": count} for dag_id, count in misses_by_dag],
+            "top_dags_with_misses": [
+                {"dag_id": dag_id, "miss_count": count}
+                for dag_id, count in misses_by_dag
+            ],
             "top_tasks_with_misses": [
-                {"dag_id": dag_id, "task_id": task_id, "miss_count": count} for dag_id, task_id, count in misses_by_task
+                {"dag_id": dag_id, "task_id": task_id, "miss_count": count}
+                for dag_id, task_id, count in misses_by_task
             ],
             "timestamp": timezone.utcnow().isoformat(),
         }
@@ -167,28 +197,32 @@ class SLAMonitor:
         session: Session = None,
     ) -> dict:
         """Analyze delays for a specific DAG.
-
+        
         Args:
             dag_id: DAG ID to analyze
             lookback_days: Days to look back for analysis
             session: SQLAlchemy session
-
+            
         Returns:
             Dictionary with delay analysis
         """
+        if not _SLA_MISS_AVAILABLE:
+            return {
+                "dag_id": dag_id,
+                "analysis_period_days": lookback_days,
+                "total_runs": 0,
+                "message": "SLA monitoring unavailable (SlaMiss model not present in this Airflow version)",
+            }
+
         cutoff_time = timezone.utcnow() - timedelta(days=lookback_days)
-
+        
         # Get all completed runs for the DAG
-        dag_runs = (
-            session.query(DagRun)
-            .filter(
-                DagRun.dag_id == dag_id,
-                DagRun.end_date >= cutoff_time,
-                DagRun.end_date.isnot(None),
-            )
-            .all()
-        )
-
+        dag_runs = session.query(DagRun).filter(
+            DagRun.dag_id == dag_id,
+            DagRun.end_date >= cutoff_time,
+            DagRun.end_date.isnot(None),
+        ).all()
+        
         if not dag_runs:
             return {
                 "dag_id": dag_id,
@@ -196,13 +230,13 @@ class SLAMonitor:
                 "total_runs": 0,
                 "message": "No completed runs found for the specified period",
             }
-
+        
         durations = []
         for run in dag_runs:
             if run.start_date and run.end_date:
                 duration = (run.end_date - run.start_date).total_seconds()
                 durations.append(duration)
-
+        
         if not durations:
             return {
                 "dag_id": dag_id,
@@ -210,27 +244,24 @@ class SLAMonitor:
                 "total_runs": len(dag_runs),
                 "message": "No duration data available",
             }
-
+        
         avg_duration = sum(durations) / len(durations)
         min_duration = min(durations)
         max_duration = max(durations)
-
+        
         # Calculate percentiles
         sorted_durations = sorted(durations)
-        p50_idx = int(len(sorted_durations) * 0.5)
-        p90_idx = int(len(sorted_durations) * 0.9)
-        p95_idx = int(len(sorted_durations) * 0.95)
-
+        n = len(sorted_durations)
+        p50_idx = min(int(n * 0.5), n - 1)
+        p90_idx = min(int(n * 0.9), n - 1)
+        p95_idx = min(int(n * 0.95), n - 1)
+        
         # SLA misses for this DAG
-        sla_miss_count = (
-            session.query(SlaMiss)
-            .filter(
-                SlaMiss.dag_id == dag_id,
-                SlaMiss.timestamp >= cutoff_time,
-            )
-            .count()
-        )
-
+        sla_miss_count = session.query(SlaMiss).filter(
+            SlaMiss.dag_id == dag_id,
+            SlaMiss.timestamp >= cutoff_time,
+        ).count()
+        
         return {
             "dag_id": dag_id,
             "analysis_period_days": lookback_days,
@@ -254,44 +285,38 @@ class SLAMonitor:
         session: Session = None,
     ) -> List[dict]:
         """Check currently running DAGs for SLA risk.
-
+        
         Args:
             sla_threshold_minutes: Minutes threshold to flag as at risk
             session: SQLAlchemy session
-
+            
         Returns:
             List of DAGs at risk of SLA miss
         """
         from airflow.utils.state import DagRunState
-
+        
         # Get currently running DAG runs
-        running_dags = (
-            session.query(DagRun)
-            .filter(
-                DagRun.state == DagRunState.RUNNING,
-            )
-            .all()
-        )
-
+        running_dags = session.query(DagRun).filter(
+            DagRun.state == DagRunState.RUNNING,
+        ).all()
+        
         at_risk = []
         current_time = timezone.utcnow()
-
+        
         for dag_run in running_dags:
             if dag_run.start_date:
                 running_time = (current_time - dag_run.start_date).total_seconds() / 60
-
+                
                 # Check if running longer than threshold
                 if running_time > sla_threshold_minutes:
-                    at_risk.append(
-                        {
-                            "dag_id": dag_run.dag_id,
-                            "run_id": dag_run.run_id,
-                            "execution_date": dag_run.execution_date.isoformat(),
-                            "start_date": dag_run.start_date.isoformat(),
-                            "running_minutes": round(running_time, 2),
-                            "threshold_minutes": sla_threshold_minutes,
-                            "risk_level": "high" if running_time > sla_threshold_minutes * 2 else "medium",
-                        }
-                    )
-
+                    at_risk.append({
+                        "dag_id": dag_run.dag_id,
+                        "run_id": dag_run.run_id,
+                        "execution_date": dag_run.execution_date.isoformat(),
+                        "start_date": dag_run.start_date.isoformat(),
+                        "running_minutes": round(running_time, 2),
+                        "threshold_minutes": sla_threshold_minutes,
+                        "risk_level": "high" if running_time > sla_threshold_minutes * 2 else "medium",
+                    })
+        
         return at_risk
