@@ -1,8 +1,17 @@
-"""Pytest configuration for Airflow Watcher tests."""
+"""Pytest configuration for Airflow Watcher tests.
+
+**Note on integration tests** — The test suite in ``tests/`` uses mocked Airflow
+stubs and an in-memory SQLite database, so no live Airflow deployment is needed.
+For true integration tests that hit a real Airflow metadata database, see the
+``test_live_comprehensive.py`` script (requires the demo Docker environment).
+Mark new integration tests with ``@pytest.mark.integration`` so they are
+excluded from CI by default: ``pytest -m 'not integration'``.
+"""
 
 import sys
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
+from functools import wraps
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,7 +24,6 @@ sys.path.insert(0, str(src_path))
 # Stub out heavy dependencies so tests run without a full Airflow/SQLAlchemy
 # install in the test environment.
 # ---------------------------------------------------------------------------
-
 
 def _make_stub(name):
     stub = MagicMock()
@@ -31,16 +39,13 @@ _airflow_conf.getboolean = lambda s, k, fallback=None: fallback
 _timezone = MagicMock()
 _timezone.utcnow = datetime.utcnow
 
-
 # provide_session: just call the function directly with session=None
 def _provide_session(f):
+    @wraps(f)
     def wrapper(*args, **kwargs):
         kwargs.setdefault("session", MagicMock())
         return f(*args, **kwargs)
-
-    wrapper.__name__ = getattr(f, "__name__", "wrapped")
     return wrapper
-
 
 _STUBS = {
     "airflow": MagicMock(),
@@ -76,36 +81,20 @@ class _ColMock(MagicMock):
     calls (e.g. DagRun.end_date >= cutoff). Without this, MagicMock raises
     TypeError when compared to a real datetime.
     """
-
-    def __ge__(self, other):
-        return MagicMock()
-
-    def __gt__(self, other):
-        return MagicMock()
-
-    def __le__(self, other):
-        return MagicMock()
-
-    def __lt__(self, other):
-        return MagicMock()
-
-    def __eq__(self, other):
-        return MagicMock()
-
-    def __ne__(self, other):
-        return MagicMock()
+    def __ge__(self, other): return MagicMock()
+    def __gt__(self, other): return MagicMock()
+    def __le__(self, other): return MagicMock()
+    def __lt__(self, other): return MagicMock()
+    def __eq__(self, other): return MagicMock()
+    def __ne__(self, other): return MagicMock()
 
 
 def _make_model_mock():
     """Create a MagicMock where attribute access returns _ColMock instances."""
     m = MagicMock()
-    m.__class__ = type(
-        "ModelMock",
-        (MagicMock,),
-        {
-            "__getattr__": lambda self, name: _ColMock(),
-        },
-    )
+    m.__class__ = type("ModelMock", (MagicMock,), {
+        "__getattr__": lambda self, name: _ColMock(),
+    })
     return m
 
 
@@ -118,7 +107,6 @@ for _model_name in ["DagRun", "TaskInstance", "DagModel", "SlaMiss", "Pool"]:
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
-
 
 @pytest.fixture
 def sample_datetime():

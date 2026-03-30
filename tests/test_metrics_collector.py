@@ -1,6 +1,6 @@
 """Tests for MetricsCollector and WatcherMetrics."""
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from airflow_watcher.metrics.collector import MetricsCollector, WatcherMetrics
 
@@ -73,11 +73,18 @@ class TestMetricsCollector:
         cached = WatcherMetrics(total_failures_24h=7)
         collector._last_metrics = cached
 
-        # Force an error inside collect by patching the import
-        with patch(
-            "airflow_watcher.monitors.dag_failure_monitor.DAGFailureMonitor",
-            side_effect=RuntimeError("DB down"),
-        ):
-            result = collector.collect()
+        # Pre-cache monitors with a broken failure monitor to trigger
+        # the error path inside collect().
+        mock_failure = MagicMock()
+        mock_failure.get_recent_failures.side_effect = RuntimeError("DB down")
+        collector._monitors = {
+            "failure": mock_failure,
+            "sla": MagicMock(),
+            "task": MagicMock(),
+            "scheduling": MagicMock(),
+            "health": MagicMock(),
+            "dependency": MagicMock(),
+        }
 
+        result = collector.collect()
         assert result.total_failures_24h == 7
