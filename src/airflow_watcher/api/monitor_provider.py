@@ -5,7 +5,6 @@ first use (after config and DB are fully initialised).
 """
 
 import threading
-from typing import Optional
 
 _lock = threading.Lock()
 

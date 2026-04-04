@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 from typing import Optional
+
 from airflow.utils import timezone
 
 
@@ -16,7 +17,7 @@ def format_duration(seconds: Optional[float]) -> str:
     """
     if seconds is None:
         return "N/A"
-    
+
     if seconds < 60:
         return f"{seconds:.1f}s"
     elif seconds < 3600:
@@ -53,10 +54,10 @@ def time_ago(dt: Optional[datetime]) -> str:
     """
     if dt is None:
         return "N/A"
-    
+
     now = timezone.utcnow()
     delta = now - dt
-    
+
     if delta < timedelta(minutes=1):
         return "just now"
     elif delta < timedelta(hours=1):
@@ -123,14 +124,14 @@ def get_all_dag_tags():
     Returns:
         List of unique tag names
     """
-    from airflow.models import DagModel, DagTag
+    from airflow.models import DagTag
     from airflow.utils.db import provide_session
-    
+
     @provide_session
     def _get_tags(session=None):
         tags = session.query(DagTag.name).distinct().all()
         return sorted([t[0] for t in tags if t[0]])
-    
+
     try:
         return _get_tags()
     except Exception:
@@ -145,7 +146,7 @@ def get_all_dag_owners():
     """
     from airflow.models import DagModel
     from airflow.utils.db import provide_session
-    
+
     @provide_session
     def _get_owners(session=None):
         owners = session.query(DagModel.owners).distinct().all()
@@ -158,7 +159,7 @@ def get_all_dag_owners():
                     if owner:
                         all_owners.add(owner)
         return sorted(list(all_owners))
-    
+
     try:
         return _get_owners()
     except Exception:
@@ -177,25 +178,25 @@ def get_dags_by_filter(tag: str = None, owner: str = None):
     """
     from airflow.models import DagModel, DagTag
     from airflow.utils.db import provide_session
-    
+
     if not tag and not owner:
         return None  # No filter
-    
+
     @provide_session
     def _get_dags(session=None):
         query = session.query(DagModel.dag_id)
-        
+
         if tag:
             # Join with DagTag table
             query = query.join(DagTag, DagModel.dag_id == DagTag.dag_id).filter(
                 DagTag.name == tag
             )
-        
+
         if owner:
             query = query.filter(DagModel.owners.contains(owner))
-        
+
         return set([d[0] for d in query.all()])
-    
+
     try:
         return _get_dags()
     except Exception:

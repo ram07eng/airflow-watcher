@@ -1,12 +1,9 @@
 """Tests for DAG Failure Monitor."""
 
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
 
-import pytest
-
-from airflow_watcher.monitors.dag_failure_monitor import DAGFailureMonitor
 from airflow_watcher.models.failure import DAGFailure, TaskFailure
+from airflow_watcher.monitors.dag_failure_monitor import DAGFailureMonitor
 
 
 class TestDAGFailureMonitor:
