@@ -8,10 +8,10 @@ from airflow.utils import timezone
 
 def format_duration(seconds: Optional[float]) -> str:
     """Format duration in seconds to human-readable string.
-    
+
     Args:
         seconds: Duration in seconds
-        
+
     Returns:
         Human-readable duration string
     """
@@ -30,11 +30,11 @@ def format_duration(seconds: Optional[float]) -> str:
 
 def format_datetime(dt: Optional[datetime], format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
     """Format datetime to string.
-    
+
     Args:
         dt: Datetime object
         format_str: Format string
-        
+
     Returns:
         Formatted datetime string
     """
@@ -45,10 +45,10 @@ def format_datetime(dt: Optional[datetime], format_str: str = "%Y-%m-%d %H:%M:%S
 
 def time_ago(dt: Optional[datetime]) -> str:
     """Get human-readable time ago string.
-    
+
     Args:
         dt: Datetime object
-        
+
     Returns:
         Human-readable "time ago" string
     """
@@ -73,11 +73,11 @@ def time_ago(dt: Optional[datetime]) -> str:
 
 def truncate_string(s: str, max_length: int = 100) -> str:
     """Truncate string to max length.
-    
+
     Args:
         s: String to truncate
         max_length: Maximum length
-        
+
     Returns:
         Truncated string with ellipsis if needed
     """
@@ -88,10 +88,10 @@ def truncate_string(s: str, max_length: int = 100) -> str:
 
 def get_severity_color(failure_count: int) -> str:
     """Get severity color based on failure count.
-    
+
     Args:
         failure_count: Number of failures
-        
+
     Returns:
         CSS color string
     """
@@ -105,11 +105,11 @@ def get_severity_color(failure_count: int) -> str:
 
 def calculate_success_rate(total: int, failed: int) -> float:
     """Calculate success rate percentage.
-    
+
     Args:
         total: Total runs
         failed: Failed runs
-        
+
     Returns:
         Success rate as percentage
     """
@@ -120,7 +120,7 @@ def calculate_success_rate(total: int, failed: int) -> float:
 
 def get_all_dag_tags():
     """Get all unique DAG tags from the database.
-    
+
     Returns:
         List of unique tag names
     """
@@ -140,7 +140,7 @@ def get_all_dag_tags():
 
 def get_all_dag_owners():
     """Get all unique DAG owners from the database.
-    
+
     Returns:
         List of unique owner names
     """
@@ -168,11 +168,11 @@ def get_all_dag_owners():
 
 def get_dags_by_filter(tag: str = None, owner: str = None):
     """Get DAG IDs filtered by tag and/or owner.
-    
+
     Args:
         tag: Filter by this tag
         owner: Filter by this owner
-        
+
     Returns:
         Set of matching DAG IDs, or None if no filter applied
     """

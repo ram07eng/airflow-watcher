@@ -124,11 +124,11 @@ RULE_TEMPLATES = {
 
 def get_template_rules(template_name: str) -> List[AlertRule]:
     """Get alert rules from a predefined template.
-    
+
     Args:
-        template_name: One of: production_strict, production_balanced, 
+        template_name: One of: production_strict, production_balanced,
                        production_relaxed, development
-    
+
     Returns:
         List of AlertRule objects
     """
@@ -153,7 +153,7 @@ def create_custom_rule(
     tag_filter: Optional[str] = None,
 ) -> AlertRule:
     """Create a custom alert rule.
-    
+
     Args:
         name: Unique rule name
         metric: Metric to evaluate (e.g., "failures.total_24h")
@@ -165,7 +165,7 @@ def create_custom_rule(
         dag_filter: Regex pattern to filter DAG IDs
         owner_filter: Filter by DAG owner
         tag_filter: Filter by DAG tag
-        
+
     Returns:
         AlertRule object
     """
@@ -201,10 +201,10 @@ def create_custom_rule(
 
 def load_rules_from_file(filepath: str) -> List[AlertRule]:
     """Load alert rules from a JSON file.
-    
+
     Args:
         filepath: Path to JSON file
-        
+
     Returns:
         List of AlertRule objects
     """
@@ -231,7 +231,7 @@ def load_rules_from_file(filepath: str) -> List[AlertRule]:
 
 def save_rules_to_file(rules: List[AlertRule], filepath: str):
     """Save alert rules to a JSON file.
-    
+
     Args:
         rules: List of AlertRule objects
         filepath: Path to save JSON file
@@ -262,11 +262,11 @@ def save_rules_to_file(rules: List[AlertRule], filepath: str):
 
 def load_rules_from_env() -> List[AlertRule]:
     """Load alert rules from environment variables.
-    
+
     Environment variable format:
         WATCHER_ALERT_RULE_1='{"name":"rule1","metric":"failures.total_24h",...}'
         WATCHER_ALERT_RULE_2='{"name":"rule2",...}'
-    
+
     Returns:
         List of AlertRule objects
     """
