@@ -7,8 +7,6 @@ first use (after config and DB are fully initialised).
 import threading
 from typing import Optional
 
-from airflow_watcher.config import WatcherConfig
-
 _lock = threading.Lock()
 
 _failure_monitor = None
@@ -17,13 +15,27 @@ _task_monitor = None
 _scheduling_monitor = None
 _dag_health_monitor = None
 _dependency_monitor = None
-_config: Optional[WatcherConfig] = None
+_config = None
 
 
-def _get_config() -> WatcherConfig:
+def _get_config():
+    """Return a config object with env-var-loaded settings.
+
+    Uses StandaloneConfig (no Airflow dependency) so monitors receive
+    the actual values from AIRFLOW_WATCHER_* environment variables
+    rather than WatcherConfig defaults.
+    """
     global _config
     if _config is None:
-        _config = WatcherConfig()
+        from airflow_watcher.api.standalone_config import StandaloneConfig
+        try:
+            _config = StandaloneConfig.from_env()
+        except (ValueError, SystemExit):
+            # Fallback: if standalone config fails (e.g. missing DB_URI in
+            # test context), create a minimal WatcherConfig with env overrides.
+            from airflow_watcher.config import WatcherConfig
+            _config = WatcherConfig()
+            _config._load_from_env()
     return _config
 
 

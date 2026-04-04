@@ -36,7 +36,12 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
     global _start_time
 
     load_dotenv(override=False)
-    config = StandaloneConfig.from_env()
+    try:
+        config = StandaloneConfig.from_env()
+    except ValueError as exc:
+        logger.error("Configuration error: %s", exc)
+        import sys
+        sys.exit(1)
     init_db(config.db_uri, query_timeout_ms=config.query_timeout_ms)
 
     _start_time = time.monotonic()

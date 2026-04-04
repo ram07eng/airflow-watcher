@@ -16,7 +16,7 @@ class Envelope(BaseModel):
 
     status: str = Field("success", description="'success' or 'error'")
     data: Any = Field(None, description="Response payload (varies by endpoint)")
-    error: Optional[str] = Field(None, description="Error message when status='error'")
+    message: Optional[str] = Field(None, description="Error message when status='error'")
     timestamp: Optional[str] = Field(None, description="ISO 8601 UTC timestamp")
 
 

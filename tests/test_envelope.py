@@ -27,7 +27,7 @@ class TestErrorResponse:
     def test_has_required_keys(self):
         result = error_response("something went wrong")
         assert result["status"] == "error"
-        assert result["error"] == "something went wrong"
+        assert result["message"] == "something went wrong"
         assert "timestamp" in result
 
     def test_timestamp_ends_with_z(self):

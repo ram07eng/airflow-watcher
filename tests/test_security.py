@@ -441,9 +441,9 @@ class TestInformationLeakage:
     def test_401_error_body_generic(self, secure_client):
         resp = secure_client.get("/api/v1/failures/")
         body = resp.json()["detail"]
-        assert body["error"] == "Authentication required"
-        assert "key" not in body["error"].lower()
-        assert "token" not in body["error"].lower()
+        assert body["message"] == "Authentication required"
+        assert "key" not in body["message"].lower()
+        assert "token" not in body["message"].lower()
 
 
 # =====================================================================

@@ -34,6 +34,6 @@ def error_response(message: str) -> dict:
     """
     return {
         "status": "error",
-        "error": message,
+        "message": message,
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
