@@ -27,12 +27,14 @@ def _get_config():
     global _config
     if _config is None:
         from airflow_watcher.api.standalone_config import StandaloneConfig
+
         try:
             _config = StandaloneConfig.from_env()
         except (ValueError, SystemExit):
             # Fallback: if standalone config fails (e.g. missing DB_URI in
             # test context), create a minimal WatcherConfig with env overrides.
             from airflow_watcher.config import WatcherConfig
+
             _config = WatcherConfig()
             _config._load_from_env()
     return _config

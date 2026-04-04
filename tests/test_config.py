@@ -33,17 +33,18 @@ class TestWatcherConfig:
 
     def test_email_recipients_list(self):
         """Test email recipients as list."""
-        config = WatcherConfig(
-            email_recipients=["user1@example.com", "user2@example.com"]
-        )
+        config = WatcherConfig(email_recipients=["user1@example.com", "user2@example.com"])
 
         assert len(config.email_recipients) == 2
         assert "user1@example.com" in config.email_recipients
 
-    @patch.dict(os.environ, {
-        "AIRFLOW_WATCHER_SLACK_WEBHOOK_URL": "https://env-webhook.com",
-        "AIRFLOW_WATCHER_SLACK_CHANNEL": "#env-channel",
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "AIRFLOW_WATCHER_SLACK_WEBHOOK_URL": "https://env-webhook.com",
+            "AIRFLOW_WATCHER_SLACK_CHANNEL": "#env-channel",
+        },
+    )
     def test_load_from_env(self):
         """Test loading config from environment variables."""
         config = WatcherConfig()
@@ -52,9 +53,12 @@ class TestWatcherConfig:
         assert config.slack_webhook_url == "https://env-webhook.com"
         assert config.slack_channel == "#env-channel"
 
-    @patch.dict(os.environ, {
-        "AIRFLOW_WATCHER_SMTP_PORT": "465",
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "AIRFLOW_WATCHER_SMTP_PORT": "465",
+        },
+    )
     def test_load_from_env_int_value(self):
         """Test loading integer config from environment."""
         config = WatcherConfig()
@@ -62,9 +66,12 @@ class TestWatcherConfig:
 
         assert config.smtp_port == 465
 
-    @patch.dict(os.environ, {
-        "AIRFLOW_WATCHER_EMAIL_RECIPIENTS": "user1@test.com, user2@test.com",
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "AIRFLOW_WATCHER_EMAIL_RECIPIENTS": "user1@test.com, user2@test.com",
+        },
+    )
     def test_load_from_env_list_value(self):
         """Test loading list config from environment."""
         config = WatcherConfig()

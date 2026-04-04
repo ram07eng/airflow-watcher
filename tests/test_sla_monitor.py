@@ -17,6 +17,7 @@ class TestSLAMonitor:
     def test_init_with_custom_config(self):
         """Test initialization with custom config."""
         from airflow_watcher.config import WatcherConfig
+
         config = WatcherConfig(sla_check_interval_minutes=10)
         monitor = SLAMonitor(config=config)
         assert monitor.config.sla_check_interval_minutes == 10

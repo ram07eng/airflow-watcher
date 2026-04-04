@@ -66,12 +66,8 @@ async def get_dag_health(
     """Get health status for a specific DAG."""
     check_dag_access(dag_id, allowed)
 
-    failures = await asyncio.to_thread(
-        get_failure_monitor().get_recent_failures, dag_id=dag_id, limit=10
-    )
-    sla_misses = await asyncio.to_thread(
-        get_sla_monitor().get_recent_sla_misses, dag_id=dag_id, limit=10
-    )
+    failures = await asyncio.to_thread(get_failure_monitor().get_recent_failures, dag_id=dag_id, limit=10)
+    sla_misses = await asyncio.to_thread(get_sla_monitor().get_recent_sla_misses, dag_id=dag_id, limit=10)
 
     return success_response(
         {

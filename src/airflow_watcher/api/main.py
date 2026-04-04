@@ -41,6 +41,7 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
     except ValueError as exc:
         logger.error("Configuration error: %s", exc)
         import sys
+
         sys.exit(1)
     init_db(config.db_uri, query_timeout_ms=config.query_timeout_ms)
 
