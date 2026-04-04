@@ -166,7 +166,7 @@ def get_all_dag_owners():
         return []
 
 
-def get_dags_by_filter(tag: str = None, owner: str = None):
+def get_dags_by_filter(tag: Optional[str] = None, owner: Optional[str] = None):
     """Get DAG IDs filtered by tag and/or owner.
 
     Args:
