@@ -743,12 +743,12 @@ This section covers integrating Airflow Watcher with various Airflow deployment 
 1. Add `airflow-watcher` to your MWAA `requirements.txt`:
 
 ```
-airflow-watcher==0.1.2
+airflow-watcher==1.1.0
 ```
 
 For Prometheus metrics support:
 ```
-airflow-watcher[all]==0.1.2
+airflow-watcher[all]==1.1.0
 ```
 
 2. Upload `requirements.txt` to your MWAA S3 bucket:
@@ -790,7 +790,7 @@ Configure via MWAA Airflow configuration overrides:
 ```bash
 git clone https://github.com/aws/aws-mwaa-local-runner.git
 cd aws-mwaa-local-runner
-echo "airflow-watcher==0.1.2" >> requirements/requirements.txt
+echo "airflow-watcher==1.1.0" >> requirements/requirements.txt
 ./mwaa-local-env build-image
 ./mwaa-local-env start
 ```
@@ -811,7 +811,7 @@ Visit `http://localhost:8080/api/watcher/health` to verify.
 ```bash
 gcloud composer environments update <your-environment> \
   --location <region> \
-  --update-pypi-package airflow-watcher==0.1.2
+  --update-pypi-package airflow-watcher==1.1.0
 ```
 
 For Prometheus metrics support:
@@ -819,7 +819,7 @@ For Prometheus metrics support:
 ```bash
 gcloud composer environments update <your-environment> \
   --location <region> \
-  --update-pypi-package "airflow-watcher[all]==0.1.2"
+  --update-pypi-package "airflow-watcher[all]==1.1.0"
 ```
 
 2. Set environment variables (optional):
@@ -885,14 +885,14 @@ airflowHome: /opt/airflow
 
 # Option 1: Extra pip packages (recommended)
 extraPipPackages:
-  - "airflow-watcher==0.1.2"
+  - "airflow-watcher==1.1.0"
 
 # Option 2: Custom image (for faster startup)
 # Build a custom image with the plugin pre-installed
 # images:
 #   airflow:
 #     repository: your-registry/airflow-watcher
-#     tag: "2.7.3-watcher-0.1.2"
+#     tag: "2.7.3-watcher-1.1.0"
 
 # Environment variables for the webserver
 env:
@@ -942,12 +942,12 @@ kubectl create secret generic airflow-watcher-secrets \
 
 ```dockerfile
 FROM apache/airflow:2.7.3-python3.10
-RUN pip install --no-cache-dir airflow-watcher==0.1.2
+RUN pip install --no-cache-dir airflow-watcher==1.1.0
 ```
 
 ```bash
-docker build -t your-registry/airflow-watcher:2.7.3-0.1.2 .
-docker push your-registry/airflow-watcher:2.7.3-0.1.2
+docker build -t your-registry/airflow-watcher:2.7.3-1.1.0 .
+docker push your-registry/airflow-watcher:2.7.3-1.1.0
 ```
 
 Then reference it in `values.yaml`:
@@ -956,7 +956,7 @@ Then reference it in `values.yaml`:
 images:
   airflow:
     repository: your-registry/airflow-watcher
-    tag: "2.7.3-0.1.2"
+    tag: "2.7.3-1.1.0"
 ```
 
 #### Deploying the Standalone API as a Sidecar or Separate Deployment
@@ -982,7 +982,7 @@ spec:
     spec:
       containers:
         - name: watcher-api
-          image: your-registry/airflow-watcher:2.7.3-0.1.2
+          image: your-registry/airflow-watcher:2.7.3-1.1.0
           command: ["python", "src/airflow_watcher/api/main.py"]
           ports:
             - containerPort: 8081
@@ -1121,7 +1121,7 @@ sudo systemctl start airflow-watcher-api
 ```yaml
 services:
   watcher-api:
-    image: your-registry/airflow-watcher:2.7.3-0.1.2
+    image: your-registry/airflow-watcher:2.7.3-1.1.0
     command: >
       gunicorn src.airflow_watcher.api.main:app
       --workers 4

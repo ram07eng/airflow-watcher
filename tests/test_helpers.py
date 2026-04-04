@@ -1,14 +1,15 @@
 """Tests for utility helpers."""
 
+import pytest
 from datetime import datetime, timedelta
 
 from airflow_watcher.utils.helpers import (
-    calculate_success_rate,
-    format_datetime,
     format_duration,
-    get_severity_color,
+    format_datetime,
     time_ago,
     truncate_string,
+    get_severity_color,
+    calculate_success_rate,
 )
 
 

@@ -38,7 +38,7 @@ pip install airflow-watcher
 To install a specific version:
 
 ```bash
-pip install airflow-watcher==0.1.0
+pip install airflow-watcher==1.1.0
 ```
 
 ### Method 2: pip install from GitHub (Recommended)
@@ -50,7 +50,7 @@ Install directly from GitHub without cloning:
 pip install git+https://github.com/ram07eng/airflow-watcher.git
 
 # Install specific version/tag
-pip install git+https://github.com/ram07eng/airflow-watcher.git@v0.1.0
+pip install git+https://github.com/ram07eng/airflow-watcher.git@v1.1.0
 
 # Install with development dependencies
 pip install "airflow-watcher[dev] @ git+https://github.com/ram07eng/airflow-watcher.git"
@@ -93,7 +93,7 @@ Add to your project's `requirements.txt`:
 airflow-watcher @ git+https://github.com/ram07eng/airflow-watcher.git
 
 # Or with specific version
-airflow-watcher @ git+https://github.com/ram07eng/airflow-watcher.git@v0.1.0
+airflow-watcher @ git+https://github.com/ram07eng/airflow-watcher.git@v1.1.0
 ```
 
 Then install:

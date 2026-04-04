@@ -1,9 +1,11 @@
 """Tests for SLA Monitor."""
 
+import pytest
 from datetime import datetime, timedelta
+from unittest.mock import Mock, patch, MagicMock
 
-from airflow_watcher.models.sla import SLADelayWarning, SLAMissEvent
 from airflow_watcher.monitors.sla_monitor import SLAMonitor
+from airflow_watcher.models.sla import SLAMissEvent, SLADelayWarning
 
 
 class TestSLAMonitor:
@@ -17,7 +19,6 @@ class TestSLAMonitor:
     def test_init_with_custom_config(self):
         """Test initialization with custom config."""
         from airflow_watcher.config import WatcherConfig
-
         config = WatcherConfig(sla_check_interval_minutes=10)
         monitor = SLAMonitor(config=config)
         assert monitor.config.sla_check_interval_minutes == 10
@@ -34,9 +35,9 @@ class TestSLAMonitor:
             notification_sent=True,
             description="Task missed SLA by 30 minutes",
         )
-
+        
         result = event.to_dict()
-
+        
         assert result["dag_id"] == "test_dag"
         assert result["task_id"] == "test_task"
         assert result["email_sent"] is True
@@ -55,9 +56,9 @@ class TestSLAMonitor:
             threshold_minutes=30.0,
             risk_level="high",
         )
-
+        
         result = warning.to_dict()
-
+        
         assert result["dag_id"] == "test_dag"
         assert result["running_minutes"] == 45.0
         assert result["threshold_minutes"] == 30.0
@@ -72,9 +73,9 @@ class TestSLAMonitor:
             execution_date=now,
             timestamp=now,
         )
-
+        
         result = event.to_dict()
-
+        
         assert result["email_sent"] is False
         assert result["notification_sent"] is False
         assert result["description"] is None
