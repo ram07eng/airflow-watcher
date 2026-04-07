@@ -1,0 +1,220 @@
+{% extends "airflow/main.html" %}
+
+{% block title %}DAG Health{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+    .watcher-page { padding: 20px; }
+    .health-score {
+        text-align: center;
+        padding: 30px;
+        background: white;
+        border-radius: 50%;
+        width: 150px;
+        height: 150px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        margin: 0 auto 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .health-score.good { border: 6px solid #4caf50; }
+    .health-score.warning { border: 6px solid #ff9800; }
+    .health-score.critical { border: 6px solid #d32f2f; }
+    .health-score .score { font-size: 3em; font-weight: bold; }
+    .health-score .label { color: #666; font-size: 0.9em; }
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-value { font-size: 2em; font-weight: bold; color: #333; }
+    .stat-label { color: #666; font-size: 0.85em; margin-top: 5px; }
+    .section { 
+        background: white; 
+        border-radius: 8px; 
+        padding: 20px; 
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .section h2 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .error-card {
+        background: #ffebee;
+        border-left: 4px solid #d32f2f;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+    }
+    .error-card h4 { margin: 0 0 8px; color: #c62828; }
+    .error-card pre {
+        background: #fff;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 0.85em;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .data-table th, .data-table td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+    .data-table th { background: #f5f5f5; font-weight: 600; }
+    .data-table tr:hover { background: #fafafa; }
+    .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: 500;
+    }
+    .badge-danger { background: #ffebee; color: #d32f2f; }
+    .badge-warning { background: #fff3e0; color: #e65100; }
+    .badge-success { background: #e8f5e9; color: #2e7d32; }
+    .badge-info { background: #e3f2fd; color: #1565c0; }
+    .dag-link { color: #1976d2; text-decoration: none; }
+    .dag-link:hover { text-decoration: underline; }
+    .empty-state { text-align: center; padding: 40px; color: #666; }
+    .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .grid-2col { grid-template-columns: 1fr; } }
+    .tag { display: inline-block; padding: 2px 6px; background: #e0e0e0; border-radius: 3px; font-size: 0.75em; margin: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="watcher-page">
+    <h1>🏥 DAG Health Monitor</h1>
+    
+    <!-- Filter Bar -->
+    {% include "watcher/components/filter_bar.html" %}
+    
+    <div class="health-score {{ 'good' if dag_summary.health_score >= 80 else ('warning' if dag_summary.health_score >= 50 else 'critical') }}">
+        <div class="score">{{ dag_summary.health_score }}</div>
+        <div class="label">Health Score</div>
+    </div>
+    
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-value">{{ dag_summary.total_dags }}</div>
+            <div class="stat-label">Total DAGs</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #4caf50;">{{ dag_summary.active_dags }}</div>
+            <div class="stat-label">Active DAGs</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #9e9e9e;">{{ dag_summary.paused_dags }}</div>
+            <div class="stat-label">Paused DAGs</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #d32f2f;">{{ dag_summary.dags_with_errors }}</div>
+            <div class="stat-label">Parse Errors</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #2196f3;">{{ dag_summary.currently_running }}</div>
+            <div class="stat-label">Running Now</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: #ff9800;">{{ dag_summary.recent_failures_24h }}</div>
+            <div class="stat-label">Failures (24h)</div>
+        </div>
+    </div>
+
+    <!-- Import Errors -->
+    {% if import_errors %}
+    <div class="section">
+        <h2>🚫 DAG Import Errors ({{ import_errors|length }})</h2>
+        {% for error in import_errors %}
+        <div class="error-card">
+            <h4>{{ error.filename }}</h4>
+            <small>{{ error.timestamp }}</small>
+            <pre>{{ error.stacktrace }}</pre>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="grid-2col">
+        <!-- DAG Complexity -->
+        <div class="section">
+            <h2>📊 DAG Complexity (Top 10)</h2>
+            {% if complexity %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>DAG</th>
+                        <th>Tasks</th>
+                        <th>Depth</th>
+                        <th>Schedule</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dag in complexity[:10] %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('Airflow.graph', dag_id=dag.dag_id) }}" class="dag-link">{{ dag.dag_id }}</a>
+                            {% if dag.is_paused %}<span class="badge badge-warning">Paused</span>{% endif %}
+                        </td>
+                        <td>{{ dag.task_count }}</td>
+                        <td>{{ dag.max_depth }}</td>
+                        <td><small>{{ dag.schedule_interval }}</small></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">No complexity data available</div>
+            {% endif %}
+        </div>
+
+        <!-- Inactive DAGs -->
+        <div class="section">
+            <h2>😴 Inactive DAGs (> 30 days)</h2>
+            {% if inactive_dags %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>DAG</th>
+                        <th>Last Run</th>
+                        <th>Days Inactive</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dag in inactive_dags[:10] %}
+                    <tr>
+                        <td><a href="{{ url_for('Airflow.graph', dag_id=dag.dag_id) }}" class="dag-link">{{ dag.dag_id }}</a></td>
+                        <td>{{ dag.last_run or 'Never' }}</td>
+                        <td>
+                            {% if dag.days_inactive %}
+                            <span class="badge {{ 'badge-danger' if dag.days_inactive > 60 else 'badge-warning' }}">
+                                {{ dag.days_inactive }} days
+                            </span>
+                            {% else %}
+                            <span class="badge badge-danger">Never run</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">✅ All DAGs are actively running</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

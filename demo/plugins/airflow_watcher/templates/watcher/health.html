@@ -1,0 +1,300 @@
+{% extends "airflow/main.html" %}
+
+{% block title %}DAG Health{% endblock %}
+
+{% block head_css %}
+{{ super() }}
+<style>
+    .watcher-page {
+        padding: 20px;
+    }
+    .health-summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    .health-card {
+        background: white;
+        padding: 25px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        text-decoration: none;
+        display: block;
+    }
+    .health-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .health-card.healthy {
+        border-top: 4px solid #4caf50;
+    }
+    .health-card.unhealthy {
+        border-top: 4px solid #d32f2f;
+    }
+    .health-card.delayed {
+        border-top: 4px solid #ff9800;
+    }
+    .health-card.stale {
+        border-top: 4px solid #9c27b0;
+    }
+    .health-card .count {
+        font-size: 3em;
+        font-weight: bold;
+    }
+    .health-card.healthy .count { color: #4caf50; }
+    .health-card.unhealthy .count { color: #d32f2f; }
+    .health-card.delayed .count { color: #ff9800; }
+    .health-card.stale .count { color: #9c27b0; }
+    .health-card .label {
+        color: #666;
+        font-size: 1.1em;
+        margin-top: 5px;
+    }
+    .dag-list-section {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .dag-list-section h2 {
+        margin-top: 0;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #eee;
+    }
+    .dag-list-section h2.healthy { color: #4caf50; }
+    .dag-list-section h2.unhealthy { color: #d32f2f; }
+    .dag-list-section h2.running { color: #2196f3; }
+    .dag-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 15px;
+    }
+    .dag-item {
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .dag-item:hover {
+        background: #f0f0f0;
+    }
+    .dag-link {
+        color: #1976d2;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .dag-link:hover {
+        text-decoration: underline;
+    }
+    .dag-meta {
+        color: #888;
+        font-size: 0.85em;
+    }
+    .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: 500;
+    }
+    .badge-success { background: #e8f5e9; color: #2e7d32; }
+    .badge-danger { background: #ffebee; color: #d32f2f; }
+    .badge-info { background: #e3f2fd; color: #1565c0; }
+    @media (max-width: 768px) {
+        .health-summary {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    .badge-warning { background: #fff3e0; color: #e65100; }
+    .badge-stale { background: #f3e5f5; color: #7b1fa2; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="watcher-page">
+    <h1>🏥 DAG Health Status</h1>
+    
+    <!-- Filter Bar -->
+    {% include "watcher/components/filter_bar.html" %}
+    
+    <!-- Health Summary - Clickable Cards: Success → Failed → Delayed → Stale -->
+    <div class="health-summary">
+        <div class="health-card healthy">
+            <div class="count">{{ health_status.summary.healthy_count }}</div>
+            <div class="label">✅ Success</div>
+        </div>
+        <a href="{{ url_for('WatcherDashboardView.failures') }}" class="health-card unhealthy">
+            <div class="count">{{ health_status.summary.unhealthy_count }}</div>
+            <div class="label">❌ Failed</div>
+        </a>
+        <a href="{{ url_for('WatcherDashboardView.scheduling') }}" class="health-card delayed">
+            <div class="count">{{ delayed_dags|length }}</div>
+            <div class="label">⏰ Delayed</div>
+        </a>
+        <a href="{{ url_for('WatcherDashboardView.scheduling') }}" class="health-card stale">
+            <div class="count">{{ stale_dags|length }}</div>
+            <div class="label">🕸️ Stale</div>
+        </a>
+    </div>
+
+    <!-- Successful DAGs -->
+    {% if health_status.healthy %}
+    <div class="dag-list-section">
+        <h2 class="healthy">✅ Successful DAGs ({{ health_status.healthy|length }})</h2>
+        <div class="dag-grid">
+            {% for dag in health_status.healthy[:20] %}
+            <div class="dag-item">
+                <div>
+                    <a href="{{ url_for('Airflow.graph', dag_id=dag.dag_id) }}" class="dag-link">
+                        {{ dag.dag_id }}
+                    </a>
+                    <div class="dag-meta">Last run: {{ dag.last_run or 'N/A' }}</div>
+                </div>
+                <span class="badge badge-success">{{ dag.state }}</span>
+            </div>
+            {% endfor %}
+            {% if health_status.healthy|length > 20 %}
+            <div class="dag-item" style="justify-content: center;">
+                <em>...and {{ health_status.healthy|length - 20 }} more healthy DAGs</em>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Failed DAGs Section -->
+    {% if health_status.unhealthy %}
+    <div class="dag-list-section">
+        <h2 class="unhealthy">❌ Failed DAGs ({{ health_status.unhealthy|length }})
+            <a href="{{ url_for('WatcherDashboardView.failures') }}" style="font-size: 0.6em; margin-left: 10px;">View All →</a>
+        </h2>
+        <div class="dag-grid">
+            {% for dag in health_status.unhealthy[:10] %}
+            <div class="dag-item">
+                <div>
+                    <a href="{{ url_for('WatcherDashboardView.failures') }}?dag_id={{ dag.dag_id }}" class="dag-link">
+                        {{ dag.dag_id }}
+                    </a>
+                    <div class="dag-meta">Last run: {{ dag.last_run or 'N/A' }}</div>
+                </div>
+                <span class="badge badge-danger">{{ dag.state }}</span>
+            </div>
+            {% endfor %}
+            {% if health_status.unhealthy|length > 10 %}
+            <div class="dag-item" style="justify-content: center;">
+                <a href="{{ url_for('WatcherDashboardView.failures') }}">...and {{ health_status.unhealthy|length - 10 }} more failed DAGs</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Delayed DAGs Section -->
+    {% if delayed_dags %}
+    <div class="dag-list-section">
+        <h2 style="color: #ff9800;">⏰ Delayed DAGs ({{ delayed_dags|length }}) 
+            <a href="{{ url_for('WatcherDashboardView.scheduling') }}" style="font-size: 0.6em; margin-left: 10px;">View All →</a>
+        </h2>
+        <div class="dag-grid">
+            {% for dag in delayed_dags[:10] %}
+            <div class="dag-item">
+                <div>
+                    <a href="{{ url_for('Airflow.graph', dag_id=dag.dag_id) }}" class="dag-link">
+                        {{ dag.dag_id }}
+                    </a>
+                    <div class="dag-meta">Lag: {{ dag.lag_minutes|round(1) }} min</div>
+                </div>
+                <span class="badge badge-warning">delayed</span>
+            </div>
+            {% endfor %}
+            {% if delayed_dags|length > 10 %}
+            <div class="dag-item" style="justify-content: center;">
+                <a href="{{ url_for('WatcherDashboardView.scheduling') }}">...and {{ delayed_dags|length - 10 }} more delayed DAGs</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Stale DAGs Section -->
+    {% if stale_dags %}
+    <div class="dag-list-section">
+        <h2 style="color: #9c27b0;">🕸️ Stale DAGs ({{ stale_dags|length }}) 
+            <a href="{{ url_for('WatcherDashboardView.scheduling') }}" style="font-size: 0.6em; margin-left: 10px;">View All →</a>
+        </h2>
+        <div class="dag-grid">
+            {% for dag in stale_dags[:10] %}
+            <div class="dag-item">
+                <div>
+                    <a href="{{ url_for('Airflow.graph', dag_id=dag.dag_id) }}" class="dag-link">
+                        {{ dag.dag_id }}
+                    </a>
+                    <div class="dag-meta">Last run: {{ dag.hours_since_run|round(1) if dag.hours_since_run else 'never' }} hours ago</div>
+                </div>
+                <span class="badge badge-stale">{{ dag.status }}</span>
+            </div>
+            {% endfor %}
+            {% if stale_dags|length > 10 %}
+            <div class="dag-item" style="justify-content: center;">
+                <a href="{{ url_for('WatcherDashboardView.scheduling') }}">...and {{ stale_dags|length - 10 }} more stale DAGs</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Import Errors Section -->
+    {% if import_errors %}
+    <div class="dag-list-section">
+        <h2 style="color: #f44336;">🚨 Import Errors ({{ import_errors|length }})</h2>
+        <div class="dag-grid">
+            {% for error in import_errors[:10] %}
+            <div class="dag-item" style="flex-direction: column; align-items: flex-start;">
+                <div>
+                    <span class="dag-link" style="color: #d32f2f;">{{ error.filename or 'Unknown' }}</span>
+                    <div class="dag-meta" style="color: #d32f2f; margin-top: 5px;">{{ error.stacktrace[:100] if error.stacktrace else 'No details' }}...</div>
+                </div>
+            </div>
+            {% endfor %}
+            {% if import_errors|length > 10 %}
+            <div class="dag-item" style="justify-content: center;">
+                <em>...and {{ import_errors|length - 10 }} more import errors</em>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Inactive DAGs Section -->
+    {% if inactive_dags %}
+    <div class="dag-list-section">
+        <h2 style="color: #795548;">💤 Inactive DAGs ({{ inactive_dags|length }}) - No runs in 30+ days</h2>
+        <div class="dag-grid">
+            {% for dag in inactive_dags[:10] %}
+            <div class="dag-item">
+                <div>
+                    <a href="{{ url_for('Airflow.graph', dag_id=dag.dag_id) }}" class="dag-link">
+                        {{ dag.dag_id }}
+                    </a>
+                    <div class="dag-meta">{{ dag.days_inactive }} days inactive</div>
+                </div>
+                <span class="badge" style="background: #efebe9; color: #5d4037;">inactive</span>
+            </div>
+            {% endfor %}
+            {% if inactive_dags|length > 10 %}
+            <div class="dag-item" style="justify-content: center;">
+                <em>...and {{ inactive_dags|length - 10 }} more inactive DAGs</em>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,1112 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Airflow Watcher API",
+    "version": "1.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Healthz",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/failures/": {
+      "get": {
+        "tags": [
+          "failures"
+        ],
+        "summary": "Get Failures",
+        "description": "Get recent DAG failures.",
+        "operationId": "get_failures_api_v1_failures__get",
+        "parameters": [
+          {
+            "name": "dag_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 250
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dag Id"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/failures/stats": {
+      "get": {
+        "tags": [
+          "failures"
+        ],
+        "summary": "Get Failure Stats",
+        "description": "Get failure statistics.\n\nNote: Returns global aggregate metrics. The ``most_failing_dags`` list\nis filtered by the caller's RBAC permissions when RBAC is enabled.",
+        "operationId": "get_failure_stats_api_v1_failures_stats_get",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/misses": {
+      "get": {
+        "tags": [
+          "sla"
+        ],
+        "summary": "Get Sla Misses",
+        "description": "Get SLA miss events.",
+        "operationId": "get_sla_misses_api_v1_sla_misses_get",
+        "parameters": [
+          {
+            "name": "dag_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 250
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dag Id"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla/stats": {
+      "get": {
+        "tags": [
+          "sla"
+        ],
+        "summary": "Get Sla Stats",
+        "description": "Get SLA statistics.\n\nNote: Aggregate counts are global. Per-DAG breakdowns are filtered by RBAC.",
+        "operationId": "get_sla_stats_api_v1_sla_stats_get",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/long-running": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Get Long Running Tasks",
+        "description": "Get tasks running longer than the threshold, sorted by duration descending.",
+        "operationId": "get_long_running_tasks_api_v1_tasks_long_running_get",
+        "parameters": [
+          {
+            "name": "threshold_minutes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10080,
+              "minimum": 1,
+              "default": 60,
+              "title": "Threshold Minutes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/retries": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Get Retry Heavy Tasks",
+        "description": "Get tasks with excessive retries.",
+        "operationId": "get_retry_heavy_tasks_api_v1_tasks_retries_get",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          },
+          {
+            "name": "min_retries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 2,
+              "title": "Min Retries"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/zombies": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Get Zombie Tasks",
+        "description": "Get potential zombie tasks.",
+        "operationId": "get_zombie_tasks_api_v1_tasks_zombies_get",
+        "parameters": [
+          {
+            "name": "threshold_minutes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10080,
+              "minimum": 1,
+              "default": 120,
+              "title": "Threshold Minutes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/failure-patterns": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Get Failure Patterns",
+        "description": "Get task failure pattern analysis.\n\nNote: Per-task breakdowns are filtered by RBAC when enabled.",
+        "operationId": "get_failure_patterns_api_v1_tasks_failure_patterns_get",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 168,
+              "title": "Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scheduling/lag": {
+      "get": {
+        "tags": [
+          "scheduling"
+        ],
+        "summary": "Get Scheduling Lag",
+        "description": "Get scheduling lag statistics and delayed DAGs.\n\nNote: Aggregate counts are global. The delayed_dags list is RBAC-filtered.",
+        "operationId": "get_scheduling_lag_api_v1_scheduling_lag_get",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          },
+          {
+            "name": "threshold_minutes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10080,
+              "minimum": 1,
+              "default": 10,
+              "title": "Threshold Minutes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scheduling/queue": {
+      "get": {
+        "tags": [
+          "scheduling"
+        ],
+        "summary": "Get Queue Status",
+        "description": "Get current queue status. Task lists are RBAC-filtered.",
+        "operationId": "get_queue_status_api_v1_scheduling_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scheduling/pools": {
+      "get": {
+        "tags": [
+          "scheduling"
+        ],
+        "summary": "Get Pool Utilization",
+        "description": "Get pool utilization stats.\n\nNote: Pools are shared infrastructure; the list is not DAG-filtered\nbut requires authentication. The allowed parameter is accepted but\npools are global resources not tied to individual DAGs.",
+        "operationId": "get_pool_utilization_api_v1_scheduling_pools_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scheduling/stale-dags": {
+      "get": {
+        "tags": [
+          "scheduling"
+        ],
+        "summary": "Get Stale Dags",
+        "description": "Get DAGs that haven't run when expected.",
+        "operationId": "get_stale_dags_api_v1_scheduling_stale_dags_get",
+        "parameters": [
+          {
+            "name": "expected_interval_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 720,
+              "minimum": 1,
+              "default": 24,
+              "title": "Expected Interval Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scheduling/concurrent": {
+      "get": {
+        "tags": [
+          "scheduling"
+        ],
+        "summary": "Get Concurrent Runs",
+        "description": "Get DAGs with multiple concurrent runs. List is RBAC-filtered.",
+        "operationId": "get_concurrent_runs_api_v1_scheduling_concurrent_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dags/import-errors": {
+      "get": {
+        "tags": [
+          "dags"
+        ],
+        "summary": "Get Import Errors",
+        "description": "Get DAG import/parse errors. RBAC-filtered by filename containing dag_id.",
+        "operationId": "get_import_errors_api_v1_dags_import_errors_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dags/status-summary": {
+      "get": {
+        "tags": [
+          "dags"
+        ],
+        "summary": "Get Status Summary",
+        "description": "Get overall DAG status summary including health score.\n\nWhen RBAC is active, aggregate counts are still global (they do not\nreveal per-DAG information).  The health_score is also a global metric.",
+        "operationId": "get_status_summary_api_v1_dags_status_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dags/complexity": {
+      "get": {
+        "tags": [
+          "dags"
+        ],
+        "summary": "Get Dag Complexity",
+        "description": "Get DAG complexity analysis, sorted by task count descending.",
+        "operationId": "get_dag_complexity_api_v1_dags_complexity_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dags/inactive": {
+      "get": {
+        "tags": [
+          "dags"
+        ],
+        "summary": "Get Inactive Dags",
+        "description": "Get active DAGs that haven't run within the specified days.",
+        "operationId": "get_inactive_dags_api_v1_dags_inactive_get",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dependencies/upstream-failures": {
+      "get": {
+        "tags": [
+          "dependencies"
+        ],
+        "summary": "Get Upstream Failures",
+        "description": "Get tasks in upstream_failed state.",
+        "operationId": "get_upstream_failures_api_v1_dependencies_upstream_failures_get",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dependencies/cross-dag": {
+      "get": {
+        "tags": [
+          "dependencies"
+        ],
+        "summary": "Get Cross Dag Dependencies",
+        "description": "Get cross-DAG dependencies. RBAC-filtered by source/target dag_id.\n\nReturns 501 in standalone mode (requires DagBag which is unavailable).",
+        "operationId": "get_cross_dag_dependencies_api_v1_dependencies_cross_dag_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dependencies/correlations": {
+      "get": {
+        "tags": [
+          "dependencies"
+        ],
+        "summary": "Get Failure Correlations",
+        "description": "Get failure correlations between DAGs. RBAC-filtered.",
+        "operationId": "get_failure_correlations_api_v1_dependencies_correlations_get",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8760,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dependencies/impact/{dag_id}/{task_id}": {
+      "get": {
+        "tags": [
+          "dependencies"
+        ],
+        "summary": "Get Task Impact",
+        "description": "Get downstream impact of a task failure.\n\nReturns 501 in standalone mode (requires DagBag).",
+        "operationId": "get_task_impact_api_v1_dependencies_impact__dag_id___task_id__get",
+        "parameters": [
+          {
+            "name": "dag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dag Id"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/overview/": {
+      "get": {
+        "tags": [
+          "overview"
+        ],
+        "summary": "Get Overview",
+        "description": "Get comprehensive monitoring snapshot (cached 60s).\n\nCache is keyed per-user (allowed DAG set) so restricted users do not\nsee cached results from a broader scope.",
+        "operationId": "get_overview_api_v1_overview__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Get Health",
+        "description": "System health endpoint.\n\nReturns HTTP 200 when ``health_score >= 70`` AND no import errors,\notherwise HTTP 503.",
+        "operationId": "get_health_api_v1_health__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/{dag_id}": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Get Dag Health",
+        "description": "Get health status for a specific DAG.",
+        "operationId": "get_dag_health_api_v1_health__dag_id__get",
+        "parameters": [
+          {
+            "name": "dag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dag Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/rules": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Get Alert Rules",
+        "description": "List all configured alert rules.",
+        "operationId": "get_alert_rules_api_v1_alerts_rules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/evaluate": {
+      "post": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Evaluate Alerts",
+        "description": "Evaluate alert rules against current metrics and dispatch notifications.",
+        "operationId": "evaluate_alerts_api_v1_alerts_evaluate_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cache/invalidate": {
+      "post": {
+        "tags": [
+          "cache"
+        ],
+        "summary": "Invalidate Cache",
+        "description": "Clear all cached entries.",
+        "operationId": "invalidate_cache_api_v1_cache_invalidate_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Envelope": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "'success' or 'error'",
+            "default": "success"
+          },
+          "data": {
+            "title": "Data",
+            "description": "Response payload (varies by endpoint)"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message when status='error'"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp",
+            "description": "ISO 8601 UTC timestamp"
+          }
+        },
+        "type": "object",
+        "title": "Envelope",
+        "description": "Standard JSON envelope wrapping every API response."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

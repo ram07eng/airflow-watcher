@@ -1,0 +1,97 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type (use 'none' to publish current version as-is)"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - none
+
+jobs:
+  build:
+    name: Build & Publish
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Auto-bump version
+        if: github.event_name == 'workflow_dispatch' && inputs.bump != 'none'
+        run: |
+          CURRENT=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+          case "${{ inputs.bump }}" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          sed -i "s/^version = .*/version = \"${NEW_VERSION}\"/" pyproject.toml
+
+          echo "VERSION=${NEW_VERSION}" >> $GITHUB_ENV
+          echo "Bumped: ${CURRENT} → ${NEW_VERSION} (${{ inputs.bump }})"
+
+      - name: Read current version
+        if: github.event_name == 'workflow_dispatch' && inputs.bump == 'none'
+        run: |
+          VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Publishing current version: ${VERSION}"
+
+      - name: Commit version bump
+        if: github.event_name == 'workflow_dispatch' && inputs.bump != 'none'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+
+          # Skip commit if nothing changed (version already bumped from a previous failed run)
+          if git diff --cached --quiet; then
+            echo "Version already at ${VERSION} — skipping commit"
+          else
+            git commit -m "release: v${VERSION}"
+          fi
+
+          # Delete stale remote tag if it exists, then create fresh
+          git push origin :refs/tags/v${VERSION} 2>/dev/null || true
+          git tag -f "v${VERSION}"
+          git push origin main --tags
+
+      - name: Tag current version
+        if: github.event_name == 'workflow_dispatch' && inputs.bump == 'none'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git push origin :refs/tags/v${VERSION} 2>/dev/null || true
+          git tag -f "v${VERSION}"
+          git push origin --tags
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

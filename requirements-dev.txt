@@ -1,0 +1,18 @@
+# Airflow Watcher - Development Dependencies
+
+# Core dependencies (also in pyproject.toml)
+apache-airflow>=2.5.0
+flask>=2.0.0
+requests>=2.28.0
+slack-sdk>=3.19.0
+
+# Development dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+ruff>=0.1.0
+black>=23.0.0
+mypy>=1.0.0
+
+# Type stubs
+types-requests>=2.28.0
