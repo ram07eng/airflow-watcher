@@ -33,6 +33,7 @@ class DAGFailureMonitor:
         dag_id: Optional[str] = None,
         lookback_hours: int = 24,
         limit: int = 50,
+        offset: int = 0,
         session: Session = None,  # type: ignore[assignment]
     ) -> List[DAGFailure]:
         """Get recent DAG failures.
@@ -41,6 +42,7 @@ class DAGFailureMonitor:
             dag_id: Optional DAG ID to filter by
             lookback_hours: Hours to look back for failures
             limit: Maximum number of failures to return
+            offset: Number of records to skip (for pagination)
             session: SQLAlchemy session
 
         Returns:
@@ -56,7 +58,7 @@ class DAGFailureMonitor:
         if dag_id:
             query = query.filter(DagRun.dag_id == dag_id)
 
-        query = query.order_by(DagRun.end_date.desc()).limit(limit)
+        query = query.order_by(DagRun.end_date.desc()).offset(offset).limit(limit)
         dag_runs = query.all()
 
         if not dag_runs:

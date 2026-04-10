@@ -4,7 +4,8 @@ import logging
 import secrets
 from typing import Optional
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from airflow_watcher.api.envelope import error_response
 
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 # Module-level reference set during app startup.
 _api_keys: list[str] = []
+
+# Security scheme — shows the Authorize (lock) button in Swagger UI.
+_bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def configure_auth(api_keys: list[str]) -> None:
@@ -22,7 +26,10 @@ def configure_auth(api_keys: list[str]) -> None:
         logger.warning("API_KEYS not configured — authentication is DISABLED. Set AIRFLOW_WATCHER_API_KEYS to enable.")
 
 
-async def require_auth(request: Request) -> Optional[str]:
+async def require_auth(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+) -> Optional[str]:
     """FastAPI dependency that validates the ``Authorization: Bearer <token>`` header.
 
     Uses constant-time comparison to prevent timing side-channel attacks.
@@ -38,11 +45,10 @@ async def require_auth(request: Request) -> Optional[str]:
     if not _api_keys:
         return None  # Auth disabled
 
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    if credentials is None:
         raise HTTPException(status_code=401, detail=error_response("Authentication required"))
 
-    token = auth_header[7:].strip()  # Strip "Bearer " and any trailing whitespace
+    token = credentials.credentials
 
     # Constant-time comparison prevents timing attacks.
     matched_key = None

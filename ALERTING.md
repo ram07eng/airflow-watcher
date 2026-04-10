@@ -456,11 +456,3 @@ if AlertChannel.PAGERDUTY in manager.get_configured_channels():
     success = manager.test_channel(AlertChannel.PAGERDUTY)
     print(f"PagerDuty test: {'✅ Success' if success else '❌ Failed'}")
 ```
-
-Or use the CLI (coming soon):
-
-```bash
-airflow watcher test-alerts --channel slack
-airflow watcher test-alerts --channel pagerduty
-airflow watcher test-alerts --all
-```

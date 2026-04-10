@@ -57,6 +57,11 @@ class TestStandaloneConfigFromEnv:
 
     def test_rbac_disabled_by_default(self, monkeypatch):
         monkeypatch.setenv("AIRFLOW_WATCHER_DB_URI", "sqlite:///test.db")
+        # Clear vars that may leak from .env via load_dotenv in other test modules
+        monkeypatch.delenv("AIRFLOW_WATCHER_RBAC_ENABLED", raising=False)
+        monkeypatch.delenv("AIRFLOW_WATCHER_API_KEYS", raising=False)
+        monkeypatch.delenv("AIRFLOW_WATCHER_RBAC_KEY_DAG_MAPPING", raising=False)
+        monkeypatch.delenv("AIRFLOW_WATCHER_API_PORT", raising=False)
         config = StandaloneConfig.from_env()
         assert config.rbac_enabled is False
 

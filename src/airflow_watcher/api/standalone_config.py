@@ -22,6 +22,7 @@ class StandaloneConfig:
 
     # --- API-specific fields ---
     db_uri: str = ""
+    db_read_uri: Optional[str] = None
     api_host: str = "0.0.0.0"
     api_port: int = 8081
     api_keys: List[str] = field(default_factory=list)
@@ -30,7 +31,16 @@ class StandaloneConfig:
     cache_ttl: int = 60
     rate_limit_rpm: int = 120
     query_timeout_ms: int = 30000
+    request_timeout_seconds: int = 60
     rbac_fail_open: bool = True
+
+    # --- Logging settings ---
+    log_format: str = "text"  # "text" or "json"
+    log_level: str = "INFO"
+
+    # --- Connection pool settings ---
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
 
     # --- Slack settings ---
     slack_webhook_url: Optional[str] = None
@@ -89,6 +99,7 @@ class StandaloneConfig:
         # API-specific env vars
         api_env_mappings: Dict[str, str] = {
             "AIRFLOW_WATCHER_DB_URI": "db_uri",
+            "AIRFLOW_WATCHER_DB_READ_URI": "db_read_uri",
             "AIRFLOW_WATCHER_API_HOST": "api_host",
             "AIRFLOW_WATCHER_API_PORT": "api_port",
             "AIRFLOW_WATCHER_API_KEYS": "api_keys",
@@ -97,7 +108,12 @@ class StandaloneConfig:
             "AIRFLOW_WATCHER_CACHE_TTL": "cache_ttl",
             "AIRFLOW_WATCHER_RATE_LIMIT_RPM": "rate_limit_rpm",
             "AIRFLOW_WATCHER_QUERY_TIMEOUT_MS": "query_timeout_ms",
+            "AIRFLOW_WATCHER_REQUEST_TIMEOUT_SECONDS": "request_timeout_seconds",
             "AIRFLOW_WATCHER_RBAC_FAIL_OPEN": "rbac_fail_open",
+            "AIRFLOW_WATCHER_LOG_FORMAT": "log_format",
+            "AIRFLOW_WATCHER_LOG_LEVEL": "log_level",
+            "AIRFLOW_WATCHER_DB_POOL_SIZE": "db_pool_size",
+            "AIRFLOW_WATCHER_DB_MAX_OVERFLOW": "db_max_overflow",
         }
 
         # Notification / metrics env vars (same as WatcherConfig)
@@ -133,7 +149,7 @@ class StandaloneConfig:
 
         all_mappings = {**api_env_mappings, **shared_env_mappings}
 
-        _INT_FIELDS = {"smtp_port", "statsd_port", "api_port", "cache_ttl", "rate_limit_rpm", "query_timeout_ms"}
+        _INT_FIELDS = {"smtp_port", "statsd_port", "api_port", "cache_ttl", "rate_limit_rpm", "query_timeout_ms", "request_timeout_seconds", "db_pool_size", "db_max_overflow"}
         _BOOL_FIELDS = {"statsd_enabled", "use_dogstatsd", "prometheus_enabled", "rbac_enabled", "rbac_fail_open"}
         _CSV_FIELDS = {"email_recipients", "api_keys"}
         _JSON_FIELDS = {"rbac_key_dag_mapping"}

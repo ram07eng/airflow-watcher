@@ -294,10 +294,28 @@ def reflect_airflow_models(engine):
             logger.debug("Skipped mapping %s: %s", attr, exc)
 
     # serialized_dag table
-    try:
-        sd_table = Table("serialized_dag", metadata, autoload_with=engine)
-        mapper_registry.map_imperatively(sd_mod.SerializedDagModel, sd_table)
-    except (NoSuchTableError, OperationalError) as exc:
-        logger.warning("serialized_dag table not found: %s", exc)
-    except Exception as exc:
-        logger.debug("Skipped mapping SerializedDagModel: %s", exc)
+    if sd_mod is not None:
+        try:
+            sd_table = Table("serialized_dag", metadata, autoload_with=engine)
+            mapper_registry.map_imperatively(sd_mod.SerializedDagModel, sd_table)
+        except (NoSuchTableError, OperationalError) as exc:
+            logger.warning("serialized_dag table not found: %s", exc)
+        except Exception as exc:
+            logger.debug("Skipped mapping SerializedDagModel: %s", exc)
+
+    # --- Startup validation: verify critical tables were mapped ---
+    _REQUIRED_TABLES = ("DagRun", "TaskInstance", "DagModel")
+    mapped_tables = [attr for attr in _TABLE_MAP if hasattr(getattr(models, attr, None), "__table__")]
+    missing = [t for t in _REQUIRED_TABLES if t not in mapped_tables]
+    if missing:
+        logger.error(
+            "Airflow metadata schema validation failed — could not map: %s. "
+            "Monitors will not work correctly. Verify the DB contains Airflow 2.7+ tables.",
+            ", ".join(missing),
+        )
+    else:
+        logger.info(
+            "Airflow metadata schema validated: %d/%d tables mapped successfully.",
+            len(mapped_tables),
+            len(_TABLE_MAP),
+        )

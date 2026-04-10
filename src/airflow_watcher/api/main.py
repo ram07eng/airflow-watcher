@@ -14,8 +14,15 @@ from typing import Optional, Tuple
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response
 
-from airflow_watcher.api.db import get_engine, init_db
+from airflow_watcher.api.compat import install_airflow_stubs, reflect_airflow_models
+from airflow_watcher.api.db import get_engine, get_read_engine, init_db
 from airflow_watcher.api.envelope import error_response
+from airflow_watcher.api.logging_config import (
+    configure_logging,
+    generate_request_id,
+    get_request_id,
+    set_request_id,
+)
 from airflow_watcher.api.standalone_config import StandaloneConfig
 
 logger = logging.getLogger(__name__)
@@ -43,7 +50,20 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
         import sys
 
         sys.exit(1)
-    init_db(config.db_uri, query_timeout_ms=config.query_timeout_ms)
+    init_db(config.db_uri, query_timeout_ms=config.query_timeout_ms,
+            pool_size=config.db_pool_size, max_overflow=config.db_max_overflow,
+            db_read_uri=config.db_read_uri)
+
+    # Reflect Airflow metadata tables onto stub models (standalone mode).
+    engine = get_engine()
+    if engine is not None:
+        try:
+            reflect_airflow_models(engine)
+        except Exception as exc:
+            logger.warning("Could not reflect Airflow models: %s", exc)
+
+    # --- Structured logging ---
+    configure_logging(log_format=config.log_format, log_level=config.log_level)
 
     _start_time = time.monotonic()
 
@@ -87,6 +107,10 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
 
     app = FastAPI(title="Airflow Watcher API", version="1.0", lifespan=lifespan)
 
+    # Versioning: all endpoints live under /api/v1. When v2 is introduced, a
+    # /api/v2 router will be added alongside v1. A ``Sunset`` header will be
+    # returned on deprecated version prefixes to signal deprecation.
+
     # --- Configure auth & RBAC ---
     from airflow_watcher.api.auth import configure_auth
     from airflow_watcher.api.rbac_dep import configure_rbac
@@ -104,11 +128,30 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
 
     app.add_middleware(RateLimitMiddleware, max_requests=config.rate_limit_rpm, window_seconds=60)
 
+    # --- Request ID middleware ---
+    @app.middleware("http")
+    async def request_id_middleware(request: Request, call_next):
+        rid = request.headers.get("X-Request-ID") or generate_request_id()
+        set_request_id(rid)
+        response: Response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        if config.log_format == "json":
+            import time as _t
+
+            logger.info(
+                "%s %s %s",
+                request.method,
+                request.url.path,
+                response.status_code,
+                extra={"request_id": rid},
+            )
+        return response
+
     # --- Request timeout middleware (review H-3) ---
     @app.middleware("http")
     async def request_timeout_middleware(request: Request, call_next):
         try:
-            return await asyncio.wait_for(call_next(request), timeout=60.0)
+            return await asyncio.wait_for(call_next(request), timeout=config.request_timeout_seconds)
         except asyncio.TimeoutError:
             from fastapi.responses import JSONResponse
 
@@ -122,14 +165,26 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
         return response
 
     # --- Security headers middleware ---
+    _DOCS_PATHS = ("/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect")
+
     @app.middleware("http")
     async def add_security_headers(request: Request, call_next):
         response: Response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Cache-Control"] = "no-store"
+
+        if request.url.path in _DOCS_PATHS:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' https://fastapi.tiangolo.com data:; "
+                "connect-src 'self'"
+            )
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     # --- Global exception handler (never leak internals) ---
@@ -154,12 +209,25 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
             except Exception:
                 db_connected = False
 
-        status = "ok" if db_connected else "degraded"
-        return {
+        read_db_connected = None
+        read_engine = get_read_engine()
+        if read_engine is not None and read_engine is not engine:
+            try:
+                with read_engine.connect() as conn:
+                    conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+                read_db_connected = True
+            except Exception:
+                read_db_connected = False
+
+        status = "ok" if db_connected and (read_db_connected is not False) else "degraded"
+        result = {
             "status": status,
             "uptime_seconds": round(uptime, 2),
             "db_connected": db_connected,
         }
+        if read_db_connected is not None:
+            result["read_db_connected"] = read_db_connected
+        return result
 
     # --- Register API v1 routers ---
     from fastapi import APIRouter
@@ -201,9 +269,13 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
     return app, config
 
 
+# Module-level ASGI app for Gunicorn/Uvicorn: gunicorn airflow_watcher.api.main:app
+install_airflow_stubs()
+app, _config = create_app()
+
+
 def main():
     """Console script entry point for ``airflow-watcher-api``."""
     import uvicorn
 
-    application, cfg = create_app()
-    uvicorn.run(application, host=cfg.api_host, port=cfg.api_port)
+    uvicorn.run(app, host=_config.api_host, port=_config.api_port)

@@ -19,6 +19,7 @@ async def get_failures(
     dag_id: Optional[str] = Query(None, max_length=250),
     hours: int = Query(24, ge=1, le=8760),
     limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
@@ -27,10 +28,10 @@ async def get_failures(
         check_dag_access(dag_id, allowed)
 
     cache = MetricsCache.get_instance()
-    cache_key = f"failures:{dag_id}:{hours}:{limit}"
+    cache_key = f"failures:{dag_id}:{hours}:{limit}:{offset}"
 
     def _compute():
-        return get_failure_monitor().get_recent_failures(dag_id=dag_id, lookback_hours=hours, limit=limit)
+        return get_failure_monitor().get_recent_failures(dag_id=dag_id, lookback_hours=hours, limit=limit, offset=offset)
 
     failures = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     data = [f.to_dict() for f in failures]
@@ -41,6 +42,7 @@ async def get_failures(
             "failures": data,
             "count": len(data),
             "filters": {"dag_id": dag_id, "hours": hours},
+            "pagination": {"offset": offset, "limit": limit},
         }
     )
 

@@ -59,6 +59,7 @@ class SLAMonitor:
         task_id: Optional[str] = None,
         lookback_hours: int = 24,
         limit: int = 50,
+        offset: int = 0,
         session: Session = None,  # type: ignore[assignment]
     ) -> List[SLAMissEvent]:
         """Get recent SLA misses.
@@ -68,6 +69,7 @@ class SLAMonitor:
             task_id: Optional task ID to filter by
             lookback_hours: Hours to look back for SLA misses
             limit: Maximum number of misses to return
+            offset: Number of records to skip (for pagination)
             session: SQLAlchemy session
 
         Returns:
@@ -88,7 +90,7 @@ class SLAMonitor:
         if task_id:
             query = query.filter(SlaMiss.task_id == task_id)
 
-        query = query.order_by(SlaMiss.timestamp.desc()).limit(limit)
+        query = query.order_by(SlaMiss.timestamp.desc()).offset(offset).limit(limit)
 
         sla_misses = []
         for sla_miss in query.all():

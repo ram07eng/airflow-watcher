@@ -1,5 +1,11 @@
 # Airflow Watcher 👁️
 
+[![CI](https://github.com/ram07eng/airflow-watcher/actions/workflows/ci.yml/badge.svg)](https://github.com/ram07eng/airflow-watcher/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
+[![Airflow 2.7–2.10](https://img.shields.io/badge/airflow-2.7–2.10-017CEE?logo=apacheairflow&logoColor=white)](https://airflow.apache.org/)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://docs.astral.sh/ruff/)
+
 An Airflow plugin and standalone REST API for monitoring DAG failures, SLA misses, task health, and scheduling delays — with built-in alerting via Slack, Email, and PagerDuty.
 
 Airflow Watcher ships two independent components that share the same monitors, notifiers, and metrics layer:
@@ -25,12 +31,9 @@ Airflow Watcher ships two independent components that share the same monitors, n
   - [Overview](#standalone-api-fastapi)
   - [Architecture](#api-architecture)
   - [Quick Start](#quick-start)
-  - [Authentication](#authentication)
-  - [Configuration](#api-configuration)
+  - [Authentication & Configuration](#authentication--configuration)
   - [API Endpoints — `/api/v1`](#api-endpoints)
-  - [RBAC](#api-rbac-role-based-access-control)
-  - [Request Flow](#request-flow)
-  - [Integration Examples](#integration-examples)
+  - [RBAC, Request Flow & Integration Examples](#api-rbac-request-flow--integration-examples)
 - **Common**
   - [Plugin vs API Comparison](#plugin-vs-api-comparison)
   - [Project Structure](#project-structure)
@@ -54,6 +57,8 @@ Airflow Watcher ships two independent components that share the same monitors, n
 - 🗂️ **Per-Key RBAC** — Map API keys to specific DAGs
 - 📄 **Swagger UI** — Interactive docs at `/docs`
 - ⚡ **Response Caching** — Thread-safe TTL cache (default 60s)
+- 🚦 **Rate Limiting** — Per-IP sliding window (default 120 req/min, returns 429 with `Retry-After`)
+- 📋 **Structured Logging** — JSON log format with request IDs (`AIRFLOW_WATCHER_LOG_FORMAT=json`)
 - `/healthz` **Liveness Probe** — No auth required, checks DB connectivity
 
 ### Shared Features
@@ -63,6 +68,14 @@ Airflow Watcher ships two independent components that share the same monitors, n
 - 🔔 **Multi-channel Notifications** — Slack, Email, and PagerDuty alerts
 - 📡 **Metrics Export** — StatsD/Datadog and Prometheus support
 - ⚙️ **Flexible Alert Rules** — Pre-defined templates or custom rules
+
+## Airflow Version Compatibility
+
+| Airflow Version | Status |
+|-----------------|--------|
+| 2.7.x – 2.10.x | **Fully supported** — tested in CI |
+| 2.5.x – 2.6.x | Should work, not actively tested |
+| **3.x** | **Not yet supported** — the `<3.0` pin in `pyproject.toml` is intentional. Airflow 3.0 removes `airflow.models.SlaMiss` (used by `SLAMonitor`) and changes the metadata DB schema. A compatibility release is planned; track progress in the [issue tracker](https://github.com/ram07eng/airflow-watcher/issues). |
 
 ## Installation
 
@@ -366,6 +379,8 @@ A lightweight, standalone REST API that runs **outside** the Airflow webserver. 
 
 ## Quick Start
 
+📖 **See [INSTALL.md — API Quick Start](INSTALL.md#api-quick-start) for setup instructions.**
+
 ```bash
 # 1. Install standalone extras
 pip install -e ".[standalone]"
@@ -391,38 +406,9 @@ curl -H "Authorization: Bearer your-secret-api-key-here" \
 
 When running locally, the same docs are available at **http://localhost:8081/docs**.
 
-## Authentication
+## Authentication & Configuration
 
-All `/api/v1/*` endpoints require a Bearer token when `AIRFLOW_WATCHER_API_KEYS` is set:
-
-```bash
-curl -H "Authorization: Bearer <key>" http://localhost:8081/api/v1/failures/
-```
-
-| Scenario | Behavior |
-|----------|----------|
-| `API_KEYS` not set | Auth disabled — all requests pass through (dev mode) |
-| `API_KEYS` set | Every request needs `Authorization: Bearer <key>` header |
-| Invalid/missing token | `401 Unauthorized` |
-| Multiple keys | Comma-separated — rotate independently per consumer |
-
-**Security**: Tokens are compared using `secrets.compare_digest()` (constant-time) to prevent timing attacks.
-
-## API Configuration
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `AIRFLOW_WATCHER_DB_URI` | **Yes** | — | Airflow metadata DB connection string |
-| `AIRFLOW_WATCHER_API_KEYS` | No | _(disabled)_ | Comma-separated API keys for auth |
-| `AIRFLOW_WATCHER_API_HOST` | No | `0.0.0.0` | Bind host |
-| `AIRFLOW_WATCHER_API_PORT` | No | `8081` | Bind port |
-| `AIRFLOW_WATCHER_CACHE_TTL` | No | `60` | Cache TTL in seconds |
-| `AIRFLOW_WATCHER_RBAC_ENABLED` | No | `false` | Enable per-key DAG filtering |
-| `AIRFLOW_WATCHER_RBAC_KEY_DAG_MAPPING` | No | `{}` | JSON mapping: `{"key": ["dag1","dag2"]}` |
-| `AIRFLOW_WATCHER_SLACK_WEBHOOK_URL` | No | — | Slack alert webhook |
-| `AIRFLOW_WATCHER_PAGERDUTY_ROUTING_KEY` | No | — | PagerDuty routing key |
-| `AIRFLOW_WATCHER_PROMETHEUS_ENABLED` | No | `false` | Enable `/metrics` endpoint |
-| `AIRFLOW_WATCHER_STATSD_ENABLED` | No | `false` | Enable StatsD emission |
+📖 **See [INSTALL.md](INSTALL.md#api-authentication) for full authentication, configuration, and RBAC setup.**
 
 <details>
 <summary><h2>API Endpoints</h2></summary>
@@ -441,14 +427,14 @@ All endpoints return a standard JSON envelope:
 
 | Method | Path | Params | Description |
 |--------|------|--------|-------------|
-| GET | `/` | `dag_id`, `hours` (1–8760, default 24), `limit` (1–500, default 50) | Recent DAG failures |
+| GET | `/` | `dag_id`, `hours` (1–8760, default 24), `limit` (1–500, default 50), `offset` (default 0) | Recent DAG failures |
 | GET | `/stats` | `hours` (1–8760, default 24) | Failure rate statistics |
 
 #### SLA — `/api/v1/sla`
 
 | Method | Path | Params | Description |
 |--------|------|--------|-------------|
-| GET | `/misses` | `dag_id`, `hours` (1–8760, default 24), `limit` (1–500, default 50) | SLA miss events |
+| GET | `/misses` | `dag_id`, `hours` (1–8760, default 24), `limit` (1–500, default 50), `offset` (default 0) | SLA miss events |
 | GET | `/stats` | `hours` (1–8760, default 24) | SLA miss statistics |
 
 #### Tasks — `/api/v1/tasks`
@@ -525,6 +511,63 @@ All endpoints return a standard JSON envelope:
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/healthz` | Liveness probe: `{status: "ok"/"degraded", uptime_seconds, db_connected}` |
+
+<details>
+<summary><strong>Example API Responses</strong> (click to expand)</summary>
+
+**GET /api/v1/overview/**
+```json
+{
+  "status": "success",
+  "data": {
+    "failure_stats": {"total_runs": 142, "failed_runs": 3, "failure_rate": 2.11, "unique_failed_dags": 2,
+      "most_failing_dags": [{"dag_id": "etl_customers", "failure_count": 2}]},
+    "sla_stats": {"total_misses": 1, "top_dags_with_misses": [{"dag_id": "etl_customers", "miss_count": 1}]},
+    "long_running_tasks": 0, "zombie_count": 0,
+    "queue_status": {"queued_count": 2, "scheduled_count": 5},
+    "dag_summary": {"total_dags": 18, "active_dags": 15, "paused_dags": 3, "health_score": 92},
+    "import_errors": 0
+  },
+  "timestamp": "2026-04-10T08:15:32.456000Z"
+}
+```
+
+**GET /api/v1/health/** — returns HTTP 200 when healthy, 503 when degraded
+```json
+{
+  "status": "success",
+  "data": {
+    "status": "healthy", "health_score": 92,
+    "summary": {"total_dags": 18, "active_dags": 15, "paused_dags": 3, "health_score": 92},
+    "dag_health": {"healthy": 15, "degraded": 2, "critical": 1},
+    "import_error_count": 0
+  },
+  "timestamp": "2026-04-10T08:15:33.012000Z"
+}
+```
+
+**GET /api/v1/failures/?hours=24**
+```json
+{
+  "status": "success",
+  "data": {
+    "failures": [{"dag_id": "etl_customers", "run_id": "scheduled__2026-04-10T06:00:00+00:00",
+      "state": "failed", "duration": 153.0,
+      "failed_tasks": [{"task_id": "load_to_bq", "operator": "BigQueryInsertJobOperator",
+        "try_number": 3, "max_tries": 3, "state": "failed"}]}],
+    "count": 1, "filters": {"dag_id": null, "hours": 24}
+  },
+  "timestamp": "2026-04-10T08:15:34.789000Z"
+}
+```
+
+**GET /healthz**
+```json
+{"status": "ok", "uptime_seconds": 3612.45, "db_connected": true, "read_db_connected": true}
+```
+`read_db_connected` only appears when a read-replica is configured.
+
+</details>
 
 </details>
 
@@ -733,541 +776,12 @@ pytest tests/ -k "not test_logs_error_on_unreachable_db"
 
 ## Infrastructure Integration
 
-This section covers integrating Airflow Watcher with various Airflow deployment platforms. Pick the section that matches your infrastructure.
-
-<details>
-<summary><h3>AWS MWAA</h3></summary>
-
-#### Setup
-
-1. Add `airflow-watcher` to your MWAA `requirements.txt`:
-
-```
-airflow-watcher==1.1.0
-```
-
-For Prometheus metrics support:
-```
-airflow-watcher[all]==1.1.0
-```
-
-2. Upload `requirements.txt` to your MWAA S3 bucket:
-
-```bash
-aws s3 cp requirements.txt s3://<your-mwaa-bucket>/requirements.txt
-```
-
-3. Update your MWAA environment to pick up the new requirements (via AWS Console or CLI):
-
-```bash
-aws mwaa update-environment \
-  --name <your-environment-name> \
-  --requirements-s3-path requirements.txt \
-  --requirements-s3-object-version <version-id>
-```
-
-> **Note:** No `plugins.zip` is needed. Airflow auto-discovers airflow-watcher via the `airflow.plugins` entry point when installed via pip (Airflow 2.7+).
-
-4. Wait for the environment to finish updating (takes a few minutes).
-
-5. Verify at:
-```
-https://<your-mwaa-url>/api/watcher/health
-```
-
-#### Environment Variables (optional)
-
-Configure via MWAA Airflow configuration overrides:
-
-| Variable | Purpose |
-|---|---|
-| `AIRFLOW_WATCHER__SLACK_WEBHOOK_URL` | Slack notifications |
-| `AIRFLOW_WATCHER__PAGERDUTY_API_KEY` | PagerDuty alerts |
-| `AIRFLOW_WATCHER__ENABLE_PROMETHEUS` | Prometheus metrics |
-
-#### Testing Locally with MWAA Local Runner
-
-```bash
-git clone https://github.com/aws/aws-mwaa-local-runner.git
-cd aws-mwaa-local-runner
-echo "airflow-watcher==1.1.0" >> requirements/requirements.txt
-./mwaa-local-env build-image
-./mwaa-local-env start
-```
-
-Visit `http://localhost:8080/api/watcher/health` to verify.
-
-> **Note:** If using Slack or PagerDuty notifications, ensure your MWAA VPC has a NAT gateway for outbound internet access.
-
-</details>
-
-<details>
-<summary><h3>Google Cloud Composer</h3></summary>
-
-#### Setup
-
-1. Install the plugin via Cloud Composer's PyPI packages:
-
-```bash
-gcloud composer environments update <your-environment> \
-  --location <region> \
-  --update-pypi-package airflow-watcher==1.1.0
-```
-
-For Prometheus metrics support:
-
-```bash
-gcloud composer environments update <your-environment> \
-  --location <region> \
-  --update-pypi-package "airflow-watcher[all]==1.1.0"
-```
-
-2. Set environment variables (optional):
-
-```bash
-gcloud composer environments update <your-environment> \
-  --location <region> \
-  --update-env-variables \
-    AIRFLOW_WATCHER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz,\
-    AIRFLOW_WATCHER_PAGERDUTY_ROUTING_KEY=your-key,\
-    AIRFLOW_WATCHER_PROMETHEUS_ENABLED=true
-```
-
-3. Override Airflow configuration (alternative to env vars):
-
-```bash
-gcloud composer environments update <your-environment> \
-  --location <region> \
-  --update-airflow-configs \
-    watcher-slack_webhook_url=https://hooks.slack.com/services/xxx/yyy/zzz,\
-    watcher-slack_channel=#airflow-alerts
-```
-
-4. Verify the plugin is loaded:
-
-```
-https://<your-composer-url>/api/watcher/health
-```
-
-#### Networking
-
-- **Private IP Composer**: Ensure the VPC has a Cloud NAT or proxy for outbound access to Slack/PagerDuty webhooks.
-- **Shared VPC**: Firewall rules must allow egress on ports 443 (Slack, PagerDuty) and 8125 (StatsD, if applicable).
-
-#### Composer 2 vs Composer 1
-
-| Feature | Composer 2 | Composer 1 |
-|---------|-----------|-----------|
-| Plugin auto-discovery | Yes (Airflow 2.7+ entry point) | Copy to `plugins/` folder in GCS bucket |
-| PyPI install | `gcloud ... --update-pypi-package` | Same |
-| Private IP networking | Cloud NAT required | Cloud NAT required |
-
-For Composer 1, if auto-discovery doesn't work, upload the plugin manually:
-
-```bash
-gsutil cp -r src/airflow_watcher gs://<composer-bucket>/plugins/airflow_watcher
-```
-
-</details>
-
-<details>
-<summary><h3>Kubernetes / Helm (Airflow Helm Chart)</h3></summary>
-
-#### Plugin Installation via Helm Values
-
-Add airflow-watcher to the official [Apache Airflow Helm chart](https://airflow.apache.org/docs/helm-chart/stable/index.html) configuration:
-
-**values.yaml:**
-
-```yaml
-# Install the plugin as a pip package
-airflowHome: /opt/airflow
-
-# Option 1: Extra pip packages (recommended)
-extraPipPackages:
-  - "airflow-watcher==1.1.0"
-
-# Option 2: Custom image (for faster startup)
-# Build a custom image with the plugin pre-installed
-# images:
-#   airflow:
-#     repository: your-registry/airflow-watcher
-#     tag: "2.7.3-watcher-1.1.0"
-
-# Environment variables for the webserver
-env:
-  - name: AIRFLOW_WATCHER_SLACK_WEBHOOK_URL
-    valueFrom:
-      secretKeyRef:
-        name: airflow-watcher-secrets
-        key: slack-webhook-url
-  - name: AIRFLOW_WATCHER_PAGERDUTY_ROUTING_KEY
-    valueFrom:
-      secretKeyRef:
-        name: airflow-watcher-secrets
-        key: pagerduty-routing-key
-  - name: AIRFLOW_WATCHER_PROMETHEUS_ENABLED
-    value: "true"
-
-# Prometheus ServiceMonitor (if using Prometheus Operator)
-extraObjects:
-  - apiVersion: monitoring.coreos.com/v1
-    kind: ServiceMonitor
-    metadata:
-      name: airflow-watcher
-      labels:
-        release: prometheus
-    spec:
-      selector:
-        matchLabels:
-          component: webserver
-      endpoints:
-        - port: airflow-ui
-          path: /watcher/metrics
-          interval: 30s
-```
-
-#### Secrets
-
-Create a Kubernetes secret for sensitive values:
-
-```bash
-kubectl create secret generic airflow-watcher-secrets \
-  --namespace airflow \
-  --from-literal=slack-webhook-url='https://hooks.slack.com/services/xxx/yyy/zzz' \
-  --from-literal=pagerduty-routing-key='your-key'
-```
-
-#### Custom Docker Image (recommended for production)
-
-```dockerfile
-FROM apache/airflow:2.7.3-python3.10
-RUN pip install --no-cache-dir airflow-watcher==1.1.0
-```
-
-```bash
-docker build -t your-registry/airflow-watcher:2.7.3-1.1.0 .
-docker push your-registry/airflow-watcher:2.7.3-1.1.0
-```
-
-Then reference it in `values.yaml`:
-
-```yaml
-images:
-  airflow:
-    repository: your-registry/airflow-watcher
-    tag: "2.7.3-1.1.0"
-```
-
-#### Deploying the Standalone API as a Sidecar or Separate Deployment
-
-To run the standalone FastAPI service alongside Airflow on Kubernetes:
-
-```yaml
-# standalone-api-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: airflow-watcher-api
-  namespace: airflow
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: airflow-watcher-api
-  template:
-    metadata:
-      labels:
-        app: airflow-watcher-api
-    spec:
-      containers:
-        - name: watcher-api
-          image: your-registry/airflow-watcher:2.7.3-1.1.0
-          command: ["python", "src/airflow_watcher/api/main.py"]
-          ports:
-            - containerPort: 8081
-          env:
-            - name: AIRFLOW_WATCHER_DB_URI
-              valueFrom:
-                secretKeyRef:
-                  name: airflow-watcher-secrets
-                  key: db-uri
-            - name: AIRFLOW_WATCHER_API_KEYS
-              valueFrom:
-                secretKeyRef:
-                  name: airflow-watcher-secrets
-                  key: api-keys
-            - name: AIRFLOW_WATCHER_PROMETHEUS_ENABLED
-              value: "true"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 10
-            periodSeconds: 30
-          readinessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: airflow-watcher-api
-  namespace: airflow
-spec:
-  selector:
-    app: airflow-watcher-api
-  ports:
-    - port: 8081
-      targetPort: 8081
-```
-
-Apply:
-
-```bash
-kubectl apply -f standalone-api-deployment.yaml
-```
-
-</details>
-
-<details>
-<summary><h3>Production Deployment (Standalone API)</h3></summary>
-
-The standalone FastAPI service should not be run with `python main.py` in production. Use one of the following approaches.
-
-#### Behind a Reverse Proxy (Nginx)
-
-```nginx
-upstream watcher_api {
-    server 127.0.0.1:8081;
-    server 127.0.0.1:8082;  # optional: multiple workers
-}
-
-server {
-    listen 443 ssl;
-    server_name watcher.yourcompany.com;
-
-    ssl_certificate     /etc/ssl/certs/watcher.crt;
-    ssl_certificate_key /etc/ssl/private/watcher.key;
-
-    location / {
-        proxy_pass http://watcher_api;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-#### Gunicorn with Uvicorn Workers
-
-```bash
-pip install gunicorn
-
-gunicorn src.airflow_watcher.api.main:app \
-  --workers 4 \
-  --worker-class uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:8081 \
-  --access-logfile - \
-  --timeout 120
-```
-
-#### systemd Service
-
-```ini
-# /etc/systemd/system/airflow-watcher-api.service
-[Unit]
-Description=Airflow Watcher Standalone API
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=airflow
-Group=airflow
-WorkingDirectory=/opt/airflow-watcher
-EnvironmentFile=/opt/airflow-watcher/.env
-ExecStart=/opt/airflow-watcher/.venv/bin/gunicorn \
-    src.airflow_watcher.api.main:app \
-    --workers 4 \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --bind 0.0.0.0:8081 \
-    --access-logfile -
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable airflow-watcher-api
-sudo systemctl start airflow-watcher-api
-```
-
-#### Docker Compose (Production)
-
-```yaml
-services:
-  watcher-api:
-    image: your-registry/airflow-watcher:2.7.3-1.1.0
-    command: >
-      gunicorn src.airflow_watcher.api.main:app
-      --workers 4
-      --worker-class uvicorn.workers.UvicornWorker
-      --bind 0.0.0.0:8081
-      --access-logfile -
-    ports:
-      - "8081:8081"
-    env_file:
-      - .env
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-```
-
-#### Production Checklist
-
-| Item | Details |
-|------|---------|
-| **TLS** | Terminate TLS at the reverse proxy or load balancer — never expose plain HTTP externally |
-| **API keys** | Always set `AIRFLOW_WATCHER_API_KEYS` — do not run with auth disabled |
-| **RBAC** | Enable `AIRFLOW_WATCHER_RBAC_ENABLED` and map keys to DAGs for multi-tenant setups |
-| **Workers** | Run 2–4 Gunicorn workers per CPU core |
-| **Health checks** | Use `/healthz` for liveness probes — it checks DB connectivity |
-| **Secrets** | Store `DB_URI` and `API_KEYS` in a secret manager (Vault, AWS Secrets Manager, K8s secrets) |
-| **Logging** | Pipe access logs to your centralized logging platform |
-| **Monitoring** | Enable Prometheus (`AIRFLOW_WATCHER_PROMETHEUS_ENABLED=true`) and scrape `/metrics` |
-
-</details>
-
-<details>
-<summary><h3>CI/CD Integration</h3></summary>
-
-Add Airflow Watcher health checks and alert evaluation to your deployment pipelines.
-
-#### GitHub Actions — Post-Deploy Health Check
-
-```yaml
-# .github/workflows/deploy.yml
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy Airflow
-        run: |
-          # ... your deployment steps ...
-
-      - name: Verify Watcher Plugin
-        run: |
-          # Wait for webserver to be ready
-          for i in $(seq 1 30); do
-            if curl -sf "${{ secrets.AIRFLOW_URL }}/api/watcher/health"; then
-              echo "Watcher plugin is healthy"
-              exit 0
-            fi
-            echo "Waiting for webserver... ($i/30)"
-            sleep 10
-          done
-          echo "Watcher health check failed"
-          exit 1
-
-      - name: Verify Standalone API
-        if: ${{ vars.WATCHER_API_URL != '' }}
-        run: |
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.WATCHER_API_KEY }}" \
-            "${{ vars.WATCHER_API_URL }}/api/v1/health/")
-          if [ "$STATUS" = "200" ]; then
-            echo "Standalone API healthy"
-          else
-            echo "Standalone API returned $STATUS"
-            exit 1
-          fi
-
-      - name: Check DAG Import Errors
-        run: |
-          ERRORS=$(curl -sf \
-            -H "Authorization: Bearer ${{ secrets.WATCHER_API_KEY }}" \
-            "${{ vars.WATCHER_API_URL }}/api/v1/dags/import-errors" \
-            | jq '.data.import_errors | length')
-          if [ "$ERRORS" -gt 0 ]; then
-            echo "WARNING: $ERRORS DAG import errors detected after deploy"
-            curl -sf \
-              -H "Authorization: Bearer ${{ secrets.WATCHER_API_KEY }}" \
-              "${{ vars.WATCHER_API_URL }}/api/v1/dags/import-errors" | jq .
-            exit 1
-          fi
-```
-
-#### GitLab CI — Post-Deploy Validation
-
-```yaml
-# .gitlab-ci.yml
-validate-watcher:
-  stage: post-deploy
-  script:
-    - |
-      curl -sf -H "Authorization: Bearer $WATCHER_API_KEY" \
-        "$WATCHER_API_URL/api/v1/health/" | jq .
-    - |
-      curl -sf -H "Authorization: Bearer $WATCHER_API_KEY" \
-        "$WATCHER_API_URL/api/v1/dags/import-errors" \
-        | jq -e '.data.import_errors | length == 0'
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-```
-
-#### Scheduled Alert Evaluation (cron)
-
-Trigger alert evaluation periodically from a cron job or scheduled pipeline:
-
-```bash
-# crontab entry — evaluate alerts every 5 minutes
-*/5 * * * * curl -sf -X POST \
-  -H "Authorization: Bearer $WATCHER_API_KEY" \
-  http://localhost:8081/api/v1/alerts/evaluate >> /var/log/watcher-alerts.log 2>&1
-```
-
-#### Pre-Deploy DAG Validation
-
-Use the standalone API to check DAG health before deploying new DAG code:
-
-```bash
-#!/bin/bash
-# pre-deploy-check.sh
-set -euo pipefail
-
-API_URL="${WATCHER_API_URL:-http://localhost:8081}"
-API_KEY="${WATCHER_API_KEY}"
-
-echo "Checking current DAG health..."
-HEALTH=$(curl -sf -H "Authorization: Bearer $API_KEY" "$API_URL/api/v1/health/")
-SCORE=$(echo "$HEALTH" | jq -r '.data.health_score')
-
-if (( $(echo "$SCORE < 70" | bc -l) )); then
-  echo "ERROR: Health score is $SCORE (threshold: 70). Aborting deploy."
-  exit 1
-fi
-
-echo "Health score: $SCORE — proceeding with deploy."
-```
-
-</details>
+📖 **See [INSTALL.md](INSTALL.md#infrastructure-integration) for full deployment guides:**
+
+- **[AWS MWAA](INSTALL.md#aws-mwaa)** — `requirements.txt` + S3 upload, env var config, MWAA Local Runner testing
+- **[Google Cloud Composer](INSTALL.md#google-cloud-composer)** — PyPI install via `gcloud`, Composer 1 vs 2, networking
+- **[Kubernetes / Helm](INSTALL.md#kubernetes--helm-airflow-helm-chart)** — Helm values, K8s secrets, ServiceMonitor, standalone API as sidecar
+- **[Production Deployment](INSTALL.md#production-deployment-standalone-api)** — Nginx, Gunicorn, systemd, Docker Compose, production checklist
 
 ## Development
 

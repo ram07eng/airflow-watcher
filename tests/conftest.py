@@ -63,6 +63,7 @@ _STUBS = {
     "airflow.plugins_manager": MagicMock(),
     "flask_appbuilder": MagicMock(),
     "sqlalchemy": MagicMock(),
+    "sqlalchemy.exc": MagicMock(),
     "sqlalchemy.orm": MagicMock(),
     "sqlalchemy.orm.session": MagicMock(),
     "sqlalchemy.orm.Session": MagicMock(),

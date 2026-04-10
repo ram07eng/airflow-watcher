@@ -60,7 +60,7 @@ class TestAuthEnabled:
         resp = self.client.get("/test")
         body = resp.json()["detail"]
         assert body["status"] == "error"
-        assert body["message"] == "Authentication required"
+        assert body["error"] == "Authentication required"
 
 
 class TestAuthDisabled:

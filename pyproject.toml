@@ -62,6 +62,8 @@ standalone = [
     "uvicorn>=0.24.0",
     "sqlalchemy>=1.4.0",
     "python-dotenv>=1.0.0",
+    "psycopg2-binary>=2.9.0",
+    "prometheus-client>=0.15.0",
 ]
 
 [project.scripts]

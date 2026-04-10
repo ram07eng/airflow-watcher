@@ -304,6 +304,18 @@ class TestFailuresEndpoints:
         resp = client.get("/api/v1/failures/stats")
         assert resp.status_code == 200
 
+    def test_failures_offset_pagination_metadata(self, client):
+        resp = client.get("/api/v1/failures/", params={"offset": 10, "limit": 5})
+        data = resp.json()["data"]
+        assert data["pagination"]["offset"] == 10
+        assert data["pagination"]["limit"] == 5
+
+    def test_sla_misses_offset_pagination_metadata(self, client):
+        resp = client.get("/api/v1/sla/misses", params={"offset": 20, "limit": 10})
+        data = resp.json()["data"]
+        assert data["pagination"]["offset"] == 20
+        assert data["pagination"]["limit"] == 10
+
 
 class TestHealthEndpoint:
     def test_healthy_returns_200(self, client):

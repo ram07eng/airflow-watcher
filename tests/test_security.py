@@ -291,12 +291,12 @@ class TestAuthBypass:
         assert resp.status_code == 401
 
     def test_trailing_whitespace(self, secure_client):
-        # Trailing whitespace is stripped — token should be accepted.
+        # HTTPBearer strips trailing whitespace — token resolves to "sec-key" and passes.
         resp = secure_client.get("/api/v1/failures/", headers={"Authorization": "Bearer sec-key "})
         assert resp.status_code == 200
 
     def test_leading_whitespace(self, secure_client):
-        # Leading whitespace is stripped — token should be accepted.
+        # HTTPBearer strips leading whitespace — token resolves to "sec-key" and passes.
         resp = secure_client.get("/api/v1/failures/", headers={"Authorization": "Bearer  sec-key"})
         assert resp.status_code == 200
 
@@ -441,9 +441,9 @@ class TestInformationLeakage:
     def test_401_error_body_generic(self, secure_client):
         resp = secure_client.get("/api/v1/failures/")
         body = resp.json()["detail"]
-        assert body["message"] == "Authentication required"
-        assert "key" not in body["message"].lower()
-        assert "token" not in body["message"].lower()
+        assert body["error"] == "Authentication required"
+        assert "key" not in body["error"].lower()
+        assert "token" not in body["error"].lower()
 
 
 # =====================================================================

@@ -35,8 +35,9 @@ def get_failures():
     dag_id = request.args.get("dag_id")
     hours = _safe_int(request.args.get("hours"), 24)
     limit = _safe_int(request.args.get("limit"), 50, max_val=500)
+    offset = _safe_int(request.args.get("offset"), 0, min_val=0)
 
-    failures = failure_monitor.get_recent_failures(dag_id=dag_id, lookback_hours=hours, limit=limit)
+    failures = failure_monitor.get_recent_failures(dag_id=dag_id, lookback_hours=hours, limit=limit, offset=offset)
     failures = filter_results_rbac(failures, allowed_dags)
 
     return jsonify(
@@ -78,8 +79,9 @@ def get_sla_misses():
     dag_id = request.args.get("dag_id")
     hours = _safe_int(request.args.get("hours"), 24)
     limit = _safe_int(request.args.get("limit"), 50, max_val=500)
+    offset = _safe_int(request.args.get("offset"), 0, min_val=0)
 
-    sla_misses = sla_monitor.get_recent_sla_misses(dag_id=dag_id, lookback_hours=hours, limit=limit)
+    sla_misses = sla_monitor.get_recent_sla_misses(dag_id=dag_id, lookback_hours=hours, limit=limit, offset=offset)
     sla_misses = filter_results_rbac(sla_misses, allowed_dags)
 
     return jsonify(
