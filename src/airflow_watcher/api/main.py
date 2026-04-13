@@ -266,12 +266,13 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
 
 # Module-level ASGI app for Gunicorn/Uvicorn: gunicorn airflow_watcher.api.main:app
 install_airflow_stubs()
+app: Optional[FastAPI] = None
+_config: Optional[StandaloneConfig] = None
 try:
     app, _config = create_app()
 except Exception:
     # Safe import during testing / when env vars are not set.
-    app: Optional[FastAPI] = None
-    _config: Optional[StandaloneConfig] = None
+    pass
 
 
 def main():
