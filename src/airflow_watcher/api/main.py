@@ -270,7 +270,8 @@ try:
     app, _config = create_app()
 except Exception:
     # Safe import during testing / when env vars are not set.
-    app, _config = None, None
+    app: Optional[FastAPI] = None
+    _config: Optional[StandaloneConfig] = None
 
 
 def main():
