@@ -20,7 +20,6 @@ from airflow_watcher.api.envelope import error_response
 from airflow_watcher.api.logging_config import (
     configure_logging,
     generate_request_id,
-    get_request_id,
     set_request_id,
 )
 from airflow_watcher.api.standalone_config import StandaloneConfig
@@ -136,8 +135,6 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
         response: Response = await call_next(request)
         response.headers["X-Request-ID"] = rid
         if config.log_format == "json":
-            import time as _t
-
             logger.info(
                 "%s %s %s",
                 request.method,

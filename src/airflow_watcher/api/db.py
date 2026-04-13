@@ -38,7 +38,7 @@ def init_db(db_uri: str, query_timeout_ms: int = 30000, pool_size: int = 5, max_
     """
     global _engine, _read_engine, _SessionLocal
 
-    def _make_engine(uri: str) -> "Engine":
+    def _make_engine(uri: str):
         connect_args = {}
         if "postgresql" in uri:
             connect_args["options"] = f"-c statement_timeout={query_timeout_ms}"
