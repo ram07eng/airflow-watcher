@@ -149,7 +149,17 @@ class StandaloneConfig:
 
         all_mappings = {**api_env_mappings, **shared_env_mappings}
 
-        _INT_FIELDS = {"smtp_port", "statsd_port", "api_port", "cache_ttl", "rate_limit_rpm", "query_timeout_ms", "request_timeout_seconds", "db_pool_size", "db_max_overflow"}
+        _INT_FIELDS = {
+            "smtp_port",
+            "statsd_port",
+            "api_port",
+            "cache_ttl",
+            "rate_limit_rpm",
+            "query_timeout_ms",
+            "request_timeout_seconds",
+            "db_pool_size",
+            "db_max_overflow",
+        }
         _BOOL_FIELDS = {"statsd_enabled", "use_dogstatsd", "prometheus_enabled", "rbac_enabled", "rbac_fail_open"}
         _CSV_FIELDS = {"email_recipients", "api_keys"}
         _JSON_FIELDS = {"rbac_key_dag_mapping"}

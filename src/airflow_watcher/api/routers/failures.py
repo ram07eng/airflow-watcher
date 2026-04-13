@@ -31,7 +31,9 @@ async def get_failures(
     cache_key = f"failures:{dag_id}:{hours}:{limit}:{offset}"
 
     def _compute():
-        return get_failure_monitor().get_recent_failures(dag_id=dag_id, lookback_hours=hours, limit=limit, offset=offset)
+        return get_failure_monitor().get_recent_failures(
+            dag_id=dag_id, lookback_hours=hours, limit=limit, offset=offset
+        )
 
     failures = await asyncio.to_thread(cache.get_or_compute, cache_key, _compute)
     data = [f.to_dict() for f in failures]

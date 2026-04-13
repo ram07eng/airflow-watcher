@@ -15,8 +15,7 @@ class TestReflectAirflowModelsValidation:
         """Create minimal stub models module for testing."""
         models_mod = ModuleType("airflow.models")
         models_mod.__path__ = []
-        for attr in ("DagRun", "DagModel", "TaskInstance", "SlaMiss",
-                      "Pool", "ImportError", "DagTag"):
+        for attr in ("DagRun", "DagModel", "TaskInstance", "SlaMiss", "Pool", "ImportError", "DagTag"):
             setattr(models_mod, attr, type(attr, (), {}))
 
         sd_mod = ModuleType("airflow.models.serialized_dag")
@@ -32,10 +31,13 @@ class TestReflectAirflowModelsValidation:
         # The conftest stubs sqlalchemy with MagicMock — Table() will return
         # a MagicMock which won't raise NoSuchTableError, but also won't set
         # __table__ on the class. So critical tables stay unmapped → error log.
-        with patch.dict(sys.modules, {
-            "airflow.models": models_mod,
-            "airflow.models.serialized_dag": sd_mod,
-        }):
+        with patch.dict(
+            sys.modules,
+            {
+                "airflow.models": models_mod,
+                "airflow.models.serialized_dag": sd_mod,
+            },
+        ):
             with caplog.at_level(logging.ERROR):
                 reflect_airflow_models(mock_engine)
 
@@ -47,15 +49,17 @@ class TestReflectAirflowModelsValidation:
         mock_engine = MagicMock()
 
         # Give all stubs a __table__ attr to simulate successful mapping
-        for attr in ("DagRun", "DagModel", "TaskInstance", "SlaMiss",
-                      "Pool", "ImportError", "DagTag"):
+        for attr in ("DagRun", "DagModel", "TaskInstance", "SlaMiss", "Pool", "ImportError", "DagTag"):
             getattr(models_mod, attr).__table__ = MagicMock()
         sd_mod.SerializedDagModel.__table__ = MagicMock()
 
-        with patch.dict(sys.modules, {
-            "airflow.models": models_mod,
-            "airflow.models.serialized_dag": sd_mod,
-        }):
+        with patch.dict(
+            sys.modules,
+            {
+                "airflow.models": models_mod,
+                "airflow.models.serialized_dag": sd_mod,
+            },
+        ):
             with caplog.at_level(logging.INFO):
                 reflect_airflow_models(mock_engine)
 

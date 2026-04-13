@@ -65,9 +65,7 @@ def configure_logging(log_format: str = "text", log_level: str = "INFO") -> None
     if log_format.lower() == "json":
         handler.setFormatter(JSONFormatter())
     else:
-        handler.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)-8s [%(name)s] %(message)s")
-        )
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)-8s [%(name)s] %(message)s"))
     root.addHandler(handler)
 
     # Quieten noisy libraries

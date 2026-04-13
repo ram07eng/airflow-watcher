@@ -88,6 +88,7 @@ class TestJSONFormatter:
             raise ValueError("boom")
         except ValueError:
             import sys
+
             record = self._make_record()
             record.exc_info = sys.exc_info()
         parsed = json.loads(formatter.format(record))

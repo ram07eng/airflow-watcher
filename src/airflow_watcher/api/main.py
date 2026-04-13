@@ -49,9 +49,13 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
         import sys
 
         sys.exit(1)
-    init_db(config.db_uri, query_timeout_ms=config.query_timeout_ms,
-            pool_size=config.db_pool_size, max_overflow=config.db_max_overflow,
-            db_read_uri=config.db_read_uri)
+    init_db(
+        config.db_uri,
+        query_timeout_ms=config.query_timeout_ms,
+        pool_size=config.db_pool_size,
+        max_overflow=config.db_max_overflow,
+        db_read_uri=config.db_read_uri,
+    )
 
     # Reflect Airflow metadata tables onto stub models (standalone mode).
     engine = get_engine()

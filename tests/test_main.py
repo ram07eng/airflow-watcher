@@ -61,7 +61,13 @@ def _make_app(get_engine_return=_SENTINEL, engine_connect_side_effect=None):
         mre.return_value = mock_engine
 
     app, config = create_app()
-    return app, config, mi, me, [mock_config_cls, mock_init_db_p, mock_get_engine_p, mock_get_read_engine_p, mock_dotenv_p]
+    return (
+        app,
+        config,
+        mi,
+        me,
+        [mock_config_cls, mock_init_db_p, mock_get_engine_p, mock_get_read_engine_p, mock_dotenv_p],
+    )
 
 
 @pytest.fixture
@@ -92,9 +98,11 @@ class TestCreateApp:
     def test_calls_init_db_with_config_uri(self, app_and_config):
         _, config, mock_init_db, _ = app_and_config
         mock_init_db.assert_called_once_with(
-            config.db_uri, query_timeout_ms=config.query_timeout_ms,
-            pool_size=config.db_pool_size, max_overflow=config.db_max_overflow,
-            db_read_uri=config.db_read_uri
+            config.db_uri,
+            query_timeout_ms=config.query_timeout_ms,
+            pool_size=config.db_pool_size,
+            max_overflow=config.db_max_overflow,
+            db_read_uri=config.db_read_uri,
         )
 
     def test_records_start_time(self, app_and_config):

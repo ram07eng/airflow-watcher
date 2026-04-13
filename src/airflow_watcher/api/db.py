@@ -19,8 +19,13 @@ _read_engine = None
 _SessionLocal = None
 
 
-def init_db(db_uri: str, query_timeout_ms: int = 30000, pool_size: int = 5, max_overflow: int = 10,
-            db_read_uri: Optional[str] = None) -> None:
+def init_db(
+    db_uri: str,
+    query_timeout_ms: int = 30000,
+    pool_size: int = 5,
+    max_overflow: int = 10,
+    db_read_uri: Optional[str] = None,
+) -> None:
     """Initialise the SQLAlchemy engine(s) and test connectivity.
 
     Args:
@@ -76,6 +81,7 @@ def init_db(db_uri: str, query_timeout_ms: int = 30000, pool_size: int = 5, max_
 
         # Route Airflow's @provide_session to the read replica.
         import os
+
         os.environ.setdefault("AIRFLOW__CORE__SQL_ALCHEMY_CONN", db_read_uri)
         logger.info("Monitors will query the read-replica database")
     else:
@@ -86,10 +92,14 @@ def _log_connection(label: str, uri: str) -> None:
     """Log host/port without exposing credentials."""
     try:
         from urllib.parse import urlparse
+
         _parsed = urlparse(uri)
         logger.info(
             "%s connection established: %s://%s:%s",
-            label, _parsed.scheme, _parsed.hostname, _parsed.port or "default",
+            label,
+            _parsed.scheme,
+            _parsed.hostname,
+            _parsed.port or "default",
         )
     except Exception:
         logger.info("%s connection established", label)
