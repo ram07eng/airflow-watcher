@@ -42,13 +42,7 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
     global _start_time
 
     load_dotenv(override=False)
-    try:
-        config = StandaloneConfig.from_env()
-    except ValueError as exc:
-        logger.error("Configuration error: %s", exc)
-        import sys
-
-        sys.exit(1)
+    config = StandaloneConfig.from_env()
     init_db(
         config.db_uri,
         query_timeout_ms=config.query_timeout_ms,
@@ -272,11 +266,20 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
 
 # Module-level ASGI app for Gunicorn/Uvicorn: gunicorn airflow_watcher.api.main:app
 install_airflow_stubs()
-app, _config = create_app()
+try:
+    app, _config = create_app()
+except Exception:
+    # Safe import during testing / when env vars are not set.
+    app, _config = None, None
 
 
 def main():
     """Console script entry point for ``airflow-watcher-api``."""
+    import sys
+
     import uvicorn
 
+    if app is None:
+        logger.error("Application failed to initialise. Check AIRFLOW_WATCHER_DB_URI.")
+        sys.exit(1)
     uvicorn.run(app, host=_config.api_host, port=_config.api_port)
