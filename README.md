@@ -588,9 +588,15 @@ export AIRFLOW_WATCHER_API_KEYS="team-a-key,team-b-key,admin-key"
 |-----|------|
 | `team-a-key` | Only `weather_pipeline` and `stock_collector` |
 | `team-b-key` | Only `ecommerce_etl` |
-| `admin-key` | Nothing (not in mapping — returns empty results) |
+| `admin-key` | Empty results (not in mapping — denied by default) |
 
-To grant full access, omit the key from the mapping or disable RBAC.
+To grant full access to a key, add it to the mapping with `["*"]`:
+
+```bash
+export AIRFLOW_WATCHER_RBAC_KEY_DAG_MAPPING='{"team-a-key": ["weather_pipeline"], "admin-key": ["*"]}'
+```
+
+Or set `AIRFLOW_WATCHER_RBAC_FAIL_OPEN=true` to allow unmapped keys to see all DAGs (not recommended for production).
 
 ### Request Flow
 

@@ -1,5 +1,6 @@
 """Alert management endpoints."""
 
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -66,7 +67,7 @@ def get_alert_rules(
     summary="Evaluate rules and dispatch alerts",
     response_description="Triggered alerts with current values and dispatch results per channel",
 )
-def evaluate_alerts(
+async def evaluate_alerts(
     _auth: Optional[str] = Depends(require_auth),
 ):
     """Evaluate all alert rules against live metrics and fire notifications.
@@ -80,13 +81,15 @@ def evaluate_alerts(
     """
     manager = _get_manager()
     collector = MetricsCollector()
-    metrics = collector.collect()
+    # collector.collect() and manager.send_alert() are blocking (DB + network).
+    # Run in a thread pool to avoid blocking the event loop.
+    metrics = await asyncio.to_thread(collector.collect)
 
     alerts = manager.evaluate_metrics(metrics)
 
     results = []
     for alert in alerts:
-        send_result = manager.send_alert(alert)
+        send_result = await asyncio.to_thread(manager.send_alert, alert)
         results.append(
             {
                 "rule_name": alert.rule_name,

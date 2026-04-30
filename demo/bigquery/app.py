@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -460,7 +460,8 @@ async def get_failures(
     **Tip:** start with `/api/v1/failures/stats` for an aggregate view, then drill
     into specific DAGs using the `dag_id` filter here.
     """
-    assert _bq is not None
+    if _bq is None:
+        raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     rows = _bq.get_recent_failures(dag_id=dag_id, lookback_hours=hours, limit=limit, offset=offset)
     return success(
         {
@@ -499,7 +500,8 @@ async def get_failure_stats(
 
     **Good for a demo overview slide.**
     """
-    assert _bq is not None
+    if _bq is None:
+        raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     stats = _bq.get_failure_statistics(lookback_hours=hours)
     return success(_serialise_row(stats))
 
@@ -529,7 +531,8 @@ async def get_long_running(
 
     Covers the past 48 hours regardless of the threshold setting.
     """
-    assert _bq is not None
+    if _bq is None:
+        raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     rows = _bq.get_long_running_tasks(threshold_minutes=threshold_minutes)
     return success(
         {
@@ -572,7 +575,8 @@ async def get_model_performance(
 
     **Combines performance and cost in one view — unique to BigQuery backend.**
     """
-    assert _bq is not None
+    if _bq is None:
+        raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     rows = _bq.get_model_performance(lookback_hours=hours, top_n=top_n)
     return success(
         {
@@ -616,7 +620,8 @@ async def get_scheduling_lag(
     - `avg_lag_minutes`, `max_lag_minutes`
     - `delayed_dags` — individual runs exceeding `threshold_minutes`
     """
-    assert _bq is not None
+    if _bq is None:
+        raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     data = _bq.get_scheduling_lag(lookback_hours=hours, lag_threshold_minutes=threshold_minutes)
     return success(_serialise_row(data))
 
@@ -648,7 +653,8 @@ async def get_task_graph(
     **Note:** this is a heuristic — it works well for linear and fan-out patterns
     but may miss parallelism in complex DAGs.
     """
-    assert _bq is not None
+    if _bq is None:
+        raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     if run_id is None:
         from google.cloud import bigquery as _bq_mod
 
@@ -691,7 +697,8 @@ async def get_failure_correlations(
 
     Only pairs with `co_occurrences >= 2` are returned to reduce noise.
     """
-    assert _bq is not None
+    if _bq is None:
+        raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     data = _bq.get_failure_correlations(lookback_hours=hours)
     return success(_serialise_row(data))
 
@@ -726,7 +733,8 @@ async def get_overview(
 
     **Start here for a dashboard-style overview.**
     """
-    assert _bq is not None
+    if _bq is None:
+        raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     rows = _bq.get_dag_overview(lookback_hours=hours)
     return success(
         {
@@ -770,7 +778,8 @@ async def get_cost_analysis(
     It is only possible because the dbt-bigquery adapter embeds cost metadata
     in the callback payload.
     """
-    assert _bq is not None
+    if _bq is None:
+        raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     data = _bq.get_cost_analysis(lookback_hours=hours)
     return success(_serialise_row(data))
 

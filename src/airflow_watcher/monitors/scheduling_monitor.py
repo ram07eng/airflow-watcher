@@ -122,21 +122,24 @@ class SchedulingMonitor:
         Returns:
             Dictionary with queue status
         """
-        # Tasks in queued state
+        # Tasks in queued state — cap at 500 to avoid OOM on large clusters
         queued = (
             session.query(TaskInstance)
             .filter(
                 TaskInstance.state == TaskInstanceState.QUEUED,
             )
+            .order_by(TaskInstance.queued_dttm.asc().nulls_last())
+            .limit(500)
             .all()
         )
 
-        # Tasks in scheduled state (waiting to be picked up)
+        # Tasks in scheduled state (waiting to be picked up) — cap at 500
         scheduled = (
             session.query(TaskInstance)
             .filter(
                 TaskInstance.state == TaskInstanceState.SCHEDULED,
             )
+            .limit(500)
             .all()
         )
 
@@ -201,27 +204,29 @@ class SchedulingMonitor:
 
         pools = session.query(Pool).all()
 
+        # Single query: count running + queued per pool — avoids 2×N COUNT queries
+        task_counts = (
+            session.query(
+                TaskInstance.pool,
+                TaskInstance.state,
+                func.count(TaskInstance.task_id).label("cnt"),
+            )
+            .filter(
+                TaskInstance.state.in_([TaskInstanceState.RUNNING, TaskInstanceState.QUEUED]),
+            )
+            .group_by(TaskInstance.pool, TaskInstance.state)
+            .all()
+        )
+        # Build lookup: {pool_name: {state: count}}
+        counts_by_pool: dict = {}
+        for pool_name, state, cnt in task_counts:
+            counts_by_pool.setdefault(pool_name, {})[str(state)] = cnt
+
         pool_stats = []
         for pool in pools:
-            # Count running tasks in this pool
-            running = (
-                session.query(TaskInstance)
-                .filter(
-                    TaskInstance.pool == pool.pool,
-                    TaskInstance.state == TaskInstanceState.RUNNING,
-                )
-                .count()
-            )
-
-            # Count queued tasks in this pool
-            queued = (
-                session.query(TaskInstance)
-                .filter(
-                    TaskInstance.pool == pool.pool,
-                    TaskInstance.state == TaskInstanceState.QUEUED,
-                )
-                .count()
-            )
+            pool_counts = counts_by_pool.get(pool.pool, {})
+            running = pool_counts.get(str(TaskInstanceState.RUNNING), 0)
+            queued = pool_counts.get(str(TaskInstanceState.QUEUED), 0)
 
             utilization = (running / pool.slots * 100) if pool.slots > 0 else 0
 
@@ -262,8 +267,8 @@ class SchedulingMonitor:
         active_dags = (
             session.query(DagModel)
             .filter(
-                not DagModel.is_paused,
-                DagModel.is_active,
+                DagModel.is_paused == False,  # noqa: E712 — SQLAlchemy requires == not `not`
+                DagModel.is_active == True,  # noqa: E712
             )
             .all()
         )
@@ -358,32 +363,38 @@ class SchedulingMonitor:
         )
 
         concurrent_dags = []
-        for dag_id, count in concurrent:
-            # Get the running instances
-            runs = (
+        if concurrent:
+            running_dag_ids = [dag_id for dag_id, _ in concurrent]
+            # Batch fetch all running instances — avoids N extra queries
+            all_runs = (
                 session.query(DagRun)
                 .filter(
-                    DagRun.dag_id == dag_id,
+                    DagRun.dag_id.in_(running_dag_ids),
                     DagRun.state == DagRunState.RUNNING,
                 )
-                .order_by(DagRun.execution_date.desc())
+                .order_by(DagRun.dag_id, DagRun.execution_date.desc())
                 .all()
             )
+            runs_by_dag: dict = {}
+            for run in all_runs:
+                runs_by_dag.setdefault(run.dag_id, []).append(run)
 
-            concurrent_dags.append(
-                {
-                    "dag_id": dag_id,
-                    "running_count": count,
-                    "runs": [
-                        {
-                            "run_id": r.run_id,
-                            "execution_date": r.execution_date.isoformat(),
-                            "start_date": r.start_date.isoformat() if r.start_date else None,
-                        }
-                        for r in runs
-                    ],
-                }
-            )
+            for dag_id, count in concurrent:
+                runs = runs_by_dag.get(dag_id, [])
+                concurrent_dags.append(
+                    {
+                        "dag_id": dag_id,
+                        "running_count": count,
+                        "runs": [
+                            {
+                                "run_id": r.run_id,
+                                "execution_date": r.execution_date.isoformat(),
+                                "start_date": r.start_date.isoformat() if r.start_date else None,
+                            }
+                            for r in runs
+                        ],
+                    }
+                )
 
         return {
             "dags_with_concurrent_runs": len(concurrent_dags),

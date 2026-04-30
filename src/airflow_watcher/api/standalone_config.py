@@ -32,7 +32,7 @@ class StandaloneConfig:
     rate_limit_rpm: int = 120
     query_timeout_ms: int = 30000
     request_timeout_seconds: int = 60
-    rbac_fail_open: bool = True
+    rbac_fail_open: bool = False
 
     # --- Logging settings ---
     log_format: str = "text"  # "text" or "json"
