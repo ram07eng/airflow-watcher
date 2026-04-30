@@ -16,14 +16,27 @@ from airflow_watcher.utils.cache import MetricsCache
 router = APIRouter(prefix="/health", tags=["health"])
 
 
-@router.get("/", response_model=Envelope)
+@router.get(
+    "/",
+    response_model=Envelope,
+    summary="System health check",
+    response_description="HTTP 200 when healthy, HTTP 503 with Retry-After: 30 when degraded",
+)
 async def get_health(
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """System health endpoint.
+    """Composite system health endpoint.
 
-    Returns HTTP 200 when ``health_score >= 70`` AND no import errors,
-    otherwise HTTP 503.
+    Returns **HTTP 200** when `health_score ≥ 70` AND `import_error_count == 0`.
+    Returns **HTTP 503** with `Retry-After: 30` otherwise.
+
+    Fields:
+    - `status` — `"healthy"` or `"degraded"`
+    - `health_score` — 0–100 composite score
+    - `import_error_count` — DAG files that failed to parse
+    - `dag_health` — per-state task counts
+
+    Cached 30 s.
     """
     cache = MetricsCache.get_instance()
 
@@ -57,13 +70,21 @@ async def get_health(
     return JSONResponse(content=success_response(payload), status_code=status_code, headers=headers)
 
 
-@router.get("/{dag_id}")
+@router.get(
+    "/{dag_id}",
+    summary="Per-DAG health detail",
+    response_description="Last 10 failures and SLA misses for the specified DAG",
+)
 async def get_dag_health(
     dag_id: str,
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get health status for a specific DAG."""
+    """Return the last 10 failures and last 10 SLA misses for a specific DAG.
+
+    Useful for a quick drill-down when the overview flags a DAG as problematic.
+    Returns **403** if the caller's RBAC scope does not include `dag_id`.
+    """
     check_dag_access(dag_id, allowed)
 
     failures = await asyncio.to_thread(get_failure_monitor().get_recent_failures, dag_id=dag_id, limit=10)

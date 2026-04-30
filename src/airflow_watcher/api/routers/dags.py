@@ -14,12 +14,22 @@ from airflow_watcher.utils.cache import MetricsCache
 router = APIRouter(prefix="/dags", tags=["dags"])
 
 
-@router.get("/import-errors")
+@router.get(
+    "/import-errors",
+    summary="DAG parse / import errors",
+    response_description="Files that failed to parse with their error messages",
+)
 async def get_import_errors(
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get DAG import/parse errors. RBAC-filtered by filename containing dag_id."""
+    """Return DAG files that Airflow failed to parse.
+
+    Each row includes `filename`, `error_message`, and `timestamp`.
+    Parse errors prevent DAGs from being scheduled — fix them promptly.
+
+    RBAC-filtered: only files whose path contains a permitted `dag_id` are returned.
+    """
     cache = MetricsCache.get_instance()
 
     def _compute():
@@ -36,15 +46,21 @@ async def get_import_errors(
     )
 
 
-@router.get("/status-summary")
+@router.get(
+    "/status-summary",
+    summary="Overall DAG health summary",
+    response_description="Aggregate counts and composite health score (0–100)",
+)
 async def get_status_summary(
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get overall DAG status summary including health score.
+    """Return an aggregate DAG health summary including a composite `health_score`.
 
-    When RBAC is active, aggregate counts are still global (they do not
-    reveal per-DAG information).  The health_score is also a global metric.
+    Fields include total active/paused/failed DAG counts and the `health_score`
+    (0–100). A score below 70 sets `/health/` to HTTP 503.
+
+    Aggregate counts are always global even when RBAC is active.
     """
     cache = MetricsCache.get_instance()
 
@@ -55,12 +71,20 @@ async def get_status_summary(
     return success_response(summary)
 
 
-@router.get("/complexity")
+@router.get(
+    "/complexity",
+    summary="DAG complexity analysis",
+    response_description="DAGs ranked by task count and structural complexity",
+)
 async def get_dag_complexity(
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get DAG complexity analysis, sorted by task count descending."""
+    """Return complexity metrics per DAG, sorted by task count descending.
+
+    Includes `task_count`, `branch_count`, and other structural signals.
+    High-complexity DAGs are more likely to have cascading failures. RBAC-filtered.
+    """
     cache = MetricsCache.get_instance()
 
     def _compute():
@@ -77,13 +101,25 @@ async def get_dag_complexity(
     )
 
 
-@router.get("/inactive")
+@router.get(
+    "/inactive",
+    summary="Inactive DAGs",
+    response_description="Active (unpaused) DAGs with no run in the specified number of days",
+)
 async def get_inactive_dags(
-    days: int = Query(30, ge=1, le=365),
+    days: int = Query(
+        30, ge=1, le=365,
+        description="Flag DAGs with no run in this many days.",
+        example=30,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get active DAGs that haven't run within the specified days."""
+    """Return active (unpaused) DAGs that have not executed within `days` days.
+
+    These may have broken schedules, misconfigured triggers, or be safe to retire.
+    RBAC-filtered.
+    """
     cache = MetricsCache.get_instance()
     cache_key = f"dags:inactive:days={days}"
 

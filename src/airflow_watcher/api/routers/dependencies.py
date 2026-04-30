@@ -21,13 +21,25 @@ def _is_standalone() -> bool:
     return airflow_mod is not None and not hasattr(airflow_mod, "__version__")
 
 
-@router.get("/upstream-failures")
+@router.get(
+    "/upstream-failures",
+    summary="Tasks in upstream_failed state",
+    response_description="Task instances blocked by an upstream failure",
+)
 async def get_upstream_failures(
-    hours: int = Query(24, ge=1, le=8760),
+    hours: int = Query(
+        24, ge=1, le=8760,
+        description="Lookback window in hours.",
+        example=24,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get tasks in upstream_failed state."""
+    """Return tasks currently or recently in `upstream_failed` state.
+
+    These tasks were never attempted — they were blocked because a parent task failed.
+    Use this to distinguish true failures from cascading blockages. RBAC-filtered.
+    """
     cache = MetricsCache.get_instance()
     cache_key = f"dependencies:upstream:hours={hours}"
 
@@ -45,14 +57,21 @@ async def get_upstream_failures(
     )
 
 
-@router.get("/cross-dag")
+@router.get(
+    "/cross-dag",
+    summary="Cross-DAG dependencies",
+    response_description="Sensor and trigger links between DAGs",
+)
 async def get_cross_dag_dependencies(
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get cross-DAG dependencies. RBAC-filtered by source/target dag_id.
+    """Return cross-DAG dependency links (ExternalTaskSensor / TriggerDagRunOperator).
 
-    Returns 501 in standalone mode (requires DagBag which is unavailable).
+    Requires a full Airflow install (DagBag). Returns **501** in standalone mode.
+
+    Results are RBAC-filtered: only links where both source and target `dag_id`
+    are permitted for the caller are returned.
     """
     if _is_standalone():
         raise HTTPException(
@@ -81,13 +100,25 @@ async def get_cross_dag_dependencies(
     )
 
 
-@router.get("/correlations")
+@router.get(
+    "/correlations",
+    summary="DAG failure correlations",
+    response_description="DAG pairs that fail within the same hour, suggesting shared dependencies",
+)
 async def get_failure_correlations(
-    hours: int = Query(24, ge=1, le=8760),
+    hours: int = Query(
+        24, ge=1, le=8760,
+        description="Lookback window in hours. Wider windows give stronger correlation signal.",
+        example=24,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get failure correlations between DAGs. RBAC-filtered."""
+    """Find DAG pairs that fail within the same clock hour more than once.
+
+    High co-occurrence count suggests the two DAGs share an upstream dependency
+    (e.g. same source table, same slot pool). RBAC-filtered.
+    """
     cache = MetricsCache.get_instance()
     cache_key = f"dependencies:correlations:hours={hours}"
 
@@ -111,16 +142,23 @@ async def get_failure_correlations(
     return success_response(data)
 
 
-@router.get("/impact/{dag_id}/{task_id}")
+@router.get(
+    "/impact/{dag_id}/{task_id}",
+    summary="Downstream impact radius of a task failure",
+    response_description="All downstream tasks and DAGs affected if this task fails",
+)
 async def get_task_impact(
     dag_id: str,
     task_id: str,
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get downstream impact of a task failure.
+    """Return the full downstream impact if `task_id` in `dag_id` were to fail.
 
-    Returns 501 in standalone mode (requires DagBag).
+    Requires a full Airflow install (DagBag). Returns **501** in standalone mode.
+    Returns **400** if `dag_id` or `task_id` exceeds 250 characters.
+
+    Downstream task and DAG references are RBAC-filtered to prevent cross-scope leakage.
     """
     if _is_standalone():
         raise HTTPException(

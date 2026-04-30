@@ -14,16 +14,30 @@ from airflow_watcher.utils.cache import MetricsCache
 router = APIRouter(prefix="/scheduling", tags=["scheduling"])
 
 
-@router.get("/lag")
+@router.get(
+    "/lag",
+    summary="Scheduling lag percentiles",
+    response_description="p50/p90/p95 delay between scheduled time and first task start",
+)
 async def get_scheduling_lag(
-    hours: int = Query(24, ge=1, le=8760),
-    threshold_minutes: int = Query(10, ge=1, le=10080),
+    hours: int = Query(
+        24, ge=1, le=8760,
+        description="Lookback window in hours.",
+        example=24,
+    ),
+    threshold_minutes: int = Query(
+        10, ge=1, le=10080,
+        description="DAG runs with lag exceeding this are listed in `delayed_dags`.",
+        example=10,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get scheduling lag statistics and delayed DAGs.
+    """Scheduling lag analysis — how long after `execution_date` does Airflow actually start work?
 
-    Note: Aggregate counts are global. The delayed_dags list is RBAC-filtered.
+    Returns `p50_lag_minutes`, `p90_lag_minutes`, `p95_lag_minutes`, `avg_lag_minutes`.
+
+    Aggregate percentiles are global. `delayed_dags` (runs exceeding `threshold_minutes`) is RBAC-filtered.
     """
     cache = MetricsCache.get_instance()
     cache_key = f"scheduling:lag:hours={hours}&threshold={threshold_minutes}"
@@ -39,12 +53,20 @@ async def get_scheduling_lag(
     return success_response(data)
 
 
-@router.get("/queue")
+@router.get(
+    "/queue",
+    summary="Current task queue status",
+    response_description="Queued and scheduled task counts with task lists",
+)
 async def get_queue_status(
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get current queue status. Task lists are RBAC-filtered."""
+    """Return the current count and list of queued and scheduled task instances.
+
+    `queued_tasks` and `scheduled_tasks` lists are RBAC-filtered.
+    High queue depth relative to worker capacity indicates a bottleneck.
+    """
     cache = MetricsCache.get_instance()
 
     def _compute():
@@ -58,16 +80,19 @@ async def get_queue_status(
     return success_response(data)
 
 
-@router.get("/pools")
+@router.get(
+    "/pools",
+    summary="Worker pool utilisation",
+    response_description="Per-pool slot usage: open, queued, running, deferred",
+)
 async def get_pool_utilization(
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get pool utilization stats.
+    """Return slot utilisation for every Airflow worker pool.
 
-    Note: Pools are shared infrastructure; the list is not DAG-filtered
-    but requires authentication. The allowed parameter is accepted but
-    pools are global resources not tied to individual DAGs.
+    Pools are shared infrastructure — the list is not DAG-filtered.
+    A pool with 0 open slots is a scheduling bottleneck.
     """
     cache = MetricsCache.get_instance()
 
@@ -83,13 +108,25 @@ async def get_pool_utilization(
     )
 
 
-@router.get("/stale-dags")
+@router.get(
+    "/stale-dags",
+    summary="Stale DAGs — overdue for a run",
+    response_description="Active DAGs that haven't run within the expected interval",
+)
 async def get_stale_dags(
-    expected_interval_hours: int = Query(24, ge=1, le=720),
+    expected_interval_hours: int = Query(
+        24, ge=1, le=720,
+        description="DAGs with no successful run in this many hours are flagged as stale.",
+        example=24,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get DAGs that haven't run when expected."""
+    """Return active (unpaused) DAGs that have not run within `expected_interval_hours`.
+
+    Useful for detecting silently broken schedules — paused DAGs, misconfigured
+    `schedule_interval`, or missed triggers. RBAC-filtered.
+    """
     cache = MetricsCache.get_instance()
     cache_key = f"scheduling:stale:interval={expected_interval_hours}"
 
@@ -107,12 +144,20 @@ async def get_stale_dags(
     )
 
 
-@router.get("/concurrent")
+@router.get(
+    "/concurrent",
+    summary="DAGs with concurrent runs",
+    response_description="DAGs running more than one instance simultaneously",
+)
 async def get_concurrent_runs(
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get DAGs with multiple concurrent runs. List is RBAC-filtered."""
+    """Return DAGs that currently have more than one run in `running` state.
+
+    Concurrent runs can indicate missing `max_active_runs` limits or
+    a backfill colliding with a scheduled run. RBAC-filtered.
+    """
     cache = MetricsCache.get_instance()
 
     def _compute():

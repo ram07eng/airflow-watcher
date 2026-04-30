@@ -29,15 +29,29 @@ def _allowed_hash(allowed: Optional[Set[str]]) -> str:
     return hashlib.sha256(",".join(sorted(allowed)).encode()).hexdigest()[:12]
 
 
-@router.get("/", response_model=Envelope)
+@router.get(
+    "/",
+    response_model=Envelope,
+    summary="Comprehensive monitoring snapshot",
+    response_description="Failures, SLA, queue, zombies, DAG health — all in one call",
+)
 async def get_overview(
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get comprehensive monitoring snapshot (cached 60s).
+    """Single-call monitoring snapshot aggregating all key signals.
 
-    Cache is keyed per-user (allowed DAG set) so restricted users do not
-    see cached results from a broader scope.
+    Includes:
+    - `failure_stats` — 24 h failure rates and top offending DAGs
+    - `sla_stats` — 24 h SLA miss rates
+    - `long_running_tasks` — count of tasks running > 60 min
+    - `zombie_count` — tasks stuck without a heartbeat
+    - `queue_status` — queued and scheduled task counts
+    - `dag_summary` — health score, active/paused/failed DAG counts
+    - `import_errors` — count of DAG parse failures
+
+    Cached 60 s, keyed per RBAC scope (so restricted callers never see broader cached results).
+    Per-DAG breakdowns inside sub-objects are RBAC-filtered.
     """
     cache = MetricsCache.get_instance()
     cache_key = f"overview:{_allowed_hash(allowed)}"

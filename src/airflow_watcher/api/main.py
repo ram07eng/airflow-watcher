@@ -102,7 +102,154 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
             except asyncio.CancelledError:
                 pass
 
-    app = FastAPI(title="Airflow Watcher API", version="1.0", lifespan=lifespan)
+    _DESCRIPTION = """\
+## What is this?
+
+**Airflow Watcher** is a monitoring API that connects directly to the Airflow metadata
+database and exposes structured JSON endpoints for failure detection, SLA tracking,
+task health, scheduling analysis, and dependency mapping.
+
+---
+
+## Key capabilities
+
+| Endpoint group | What it answers |
+|---|---|
+| **Overview** | Single-call snapshot: failures, SLA, queue, health score |
+| **Failures** | Which DAGs failed, failure rates, top offenders |
+| **SLA** | SLA miss events, per-DAG miss rates and trends |
+| **Tasks** | Long-running tasks, zombies, retry storms, failure patterns |
+| **Scheduling** | Lag percentiles, queue depth, pool utilisation, stale DAGs |
+| **DAGs** | Import errors, health score, complexity, inactive DAGs |
+| **Dependencies** | Upstream failures, cross-DAG links, failure correlations, impact radius |
+| **Health** | Composite health score (0–100); per-DAG last-10 failures + SLA misses |
+| **Alerts** | Rule evaluation and notification dispatch |
+| **Cache** | In-memory cache invalidation |
+
+---
+
+## Authentication
+
+All `/api/v1` endpoints require an API key passed via the `Authorization: Bearer <key>`
+header or the `X-API-Key` header. Configure keys via the `AIRFLOW_WATCHER_API_KEYS`
+environment variable (comma-separated).
+
+---
+
+## RBAC
+
+When RBAC is enabled, responses are scoped to the DAG IDs permitted for the
+caller's API key. Aggregate statistics (counts, rates) are always global;
+per-DAG breakdowns are filtered.
+
+---
+
+## Caching
+
+Most read endpoints cache results in memory (default TTL: 60 s) to reduce
+database load. Use `POST /api/v1/cache/invalidate` to flush immediately.
+"""
+
+    _TAGS = [
+        {
+            "name": "overview",
+            "description": (
+                "Single-call monitoring snapshot. Aggregates failures, SLA stats, queue depth, "
+                "zombie count, DAG health score, and import errors into one response. "
+                "Cached 60 s, keyed per RBAC scope."
+            ),
+        },
+        {
+            "name": "failures",
+            "description": (
+                "DAG run failure monitoring. `/failures/` returns raw failure rows; "
+                "`/failures/stats` aggregates into rates, total model counts, and top offending DAGs."
+            ),
+        },
+        {
+            "name": "sla",
+            "description": (
+                "SLA miss tracking. `/sla/misses` returns individual miss events; "
+                "`/sla/stats` gives miss rates and the most frequently missing DAGs and tasks."
+            ),
+        },
+        {
+            "name": "tasks",
+            "description": (
+                "Task-level health signals: long-running invocations, potential zombies, "
+                "retry storms, and failure pattern analysis (flaky vs. consistently failing tasks)."
+            ),
+        },
+        {
+            "name": "scheduling",
+            "description": (
+                "Scheduling health: p50/p90/p95 lag between scheduled time and actual execution start, "
+                "current queue and scheduled task counts, pool utilisation, stale DAGs, "
+                "and DAGs with unexpected concurrent runs."
+            ),
+        },
+        {
+            "name": "dags",
+            "description": (
+                "DAG inventory and health: import/parse errors, composite health score, "
+                "complexity analysis (task count, branching), and inactive DAGs that have stopped running."
+            ),
+        },
+        {
+            "name": "dependencies",
+            "description": (
+                "Dependency analysis: tasks stuck in `upstream_failed` state, "
+                "cross-DAG sensor/trigger links (requires full Airflow install), "
+                "failure co-occurrence correlations, and cascading impact radius for a given task."
+            ),
+        },
+        {
+            "name": "health",
+            "description": (
+                "Composite health endpoint. `GET /health/` returns HTTP 200 when `health_score ≥ 70` "
+                "and no import errors, otherwise HTTP 503 with `Retry-After: 30`. "
+                "`GET /health/{dag_id}` returns the last 10 failures and SLA misses for a specific DAG."
+            ),
+        },
+        {
+            "name": "alerts",
+            "description": (
+                "Alert rule management. `GET /alerts/rules` lists configured thresholds and channels. "
+                "`POST /alerts/evaluate` runs all rules against live metrics and dispatches "
+                "notifications (Slack, email, PagerDuty) for any that fire."
+            ),
+        },
+        {
+            "name": "cache",
+            "description": (
+                "In-memory response cache. `POST /cache/invalidate` clears all entries immediately, "
+                "forcing the next request to re-query the database. Useful after a bulk backfill "
+                "or when stale data is suspected."
+            ),
+        },
+        {
+            "name": "system",
+            "description": (
+                "Liveness probe at `/healthz` (unauthenticated). "
+                "Returns DB connectivity status, read-replica connectivity, and uptime."
+            ),
+        },
+    ]
+
+    app = FastAPI(
+        title="Airflow Watcher API",
+        version="1.0",
+        description=_DESCRIPTION,
+        openapi_tags=_TAGS,
+        lifespan=lifespan,
+        contact={
+            "name": "Data Engineering — JET",
+            "email": "ramanujam.solaimalai@justeattakeaway.com",
+        },
+        license_info={
+            "name": "Internal — not for public use",
+        },
+    )
 
     # Versioning: all endpoints live under /api/v1. When v2 is introduced, a
     # /api/v2 router will be added alongside v1. A ``Sunset`` header will be
@@ -191,8 +338,15 @@ def create_app() -> Tuple[FastAPI, StandaloneConfig]:
         return JSONResponse(status_code=500, content=error_response("An internal error occurred"))
 
     # --- /healthz endpoint (minimal public info) ---
-    @app.get("/healthz")
+    @app.get("/healthz", tags=["system"], summary="Liveness probe", response_description="DB connectivity and uptime")
     async def healthz():
+        """Unauthenticated liveness probe.
+
+        Returns `status: ok` when the primary DB is reachable (and the read replica,
+        if configured). Returns `status: degraded` otherwise.
+
+        Safe to call from load-balancer health checks — no auth required.
+        """
         uptime = time.monotonic() - _start_time
         db_connected = False
         engine = get_engine()

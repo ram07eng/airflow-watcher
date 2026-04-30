@@ -14,16 +14,37 @@ from airflow_watcher.utils.cache import MetricsCache
 router = APIRouter(prefix="/failures", tags=["failures"])
 
 
-@router.get("/")
+@router.get(
+    "/",
+    summary="List recent DAG failures",
+    response_description="Paginated list of recent DAG run failures",
+)
 async def get_failures(
-    dag_id: Optional[str] = Query(None, max_length=250),
-    hours: int = Query(24, ge=1, le=8760),
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    dag_id: Optional[str] = Query(
+        None, max_length=250,
+        description="Filter to a specific DAG ID. Leave blank for all DAGs.",
+        example="payment_etl",
+    ),
+    hours: int = Query(
+        24, ge=1, le=8760,
+        description="Lookback window in hours. Default 24 h, max 8 760 (1 year).",
+        example=24,
+    ),
+    limit: int = Query(50, ge=1, le=500, description="Page size.", example=50),
+    offset: int = Query(0, ge=0, description="Pagination offset.", example=0),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get recent DAG failures."""
+    """Return DAG run failure records within the lookback window.
+
+    Each row represents one failed DAG run and includes `dag_id`, `run_id`,
+    `execution_date`, `state`, and the task-level failure detail.
+
+    Results are RBAC-filtered: callers only see DAGs they are permitted to access.
+
+    **Tip:** start with `/failures/stats` for aggregate rates, then drill into
+    specific DAGs using the `dag_id` filter here.
+    """
     if dag_id:
         check_dag_access(dag_id, allowed)
 
@@ -49,16 +70,27 @@ async def get_failures(
     )
 
 
-@router.get("/stats")
+@router.get(
+    "/stats",
+    summary="Aggregate failure statistics",
+    response_description="Failure rates, counts, and top offending DAGs",
+)
 async def get_failure_stats(
-    hours: int = Query(24, ge=1, le=8760),
+    hours: int = Query(
+        24, ge=1, le=8760,
+        description="Lookback window in hours.",
+        example=24,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get failure statistics.
+    """Aggregate failure statistics over the lookback window.
 
-    Note: Returns global aggregate metrics. The ``most_failing_dags`` list
-    is filtered by the caller's RBAC permissions when RBAC is enabled.
+    Returns:
+    - `total_runs` / `failed_runs` / `failure_rate`
+    - `most_failing_dags` — top 10 DAGs by failure count (RBAC-filtered)
+
+    **Good first stop for a dashboard summary view.**
     """
     cache = MetricsCache.get_instance()
     cache_key = f"failures:stats:{hours}"

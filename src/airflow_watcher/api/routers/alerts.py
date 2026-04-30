@@ -28,11 +28,19 @@ def _get_manager() -> AlertManager:
     return _alert_manager
 
 
-@router.get("/rules")
+@router.get(
+    "/rules",
+    summary="List configured alert rules",
+    response_description="All alert rules with thresholds, severity, and notification channels",
+)
 def get_alert_rules(
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """List all configured alert rules."""
+    """Return all configured alert rules.
+
+    Each rule includes `metric`, `condition`, `threshold`, `severity`,
+    `channels` (Slack / email / PagerDuty), `cooldown_minutes`, and `enabled` flag.
+    """
     manager = _get_manager()
     rules = manager.get_rules()
 
@@ -53,11 +61,23 @@ def get_alert_rules(
     )
 
 
-@router.post("/evaluate")
+@router.post(
+    "/evaluate",
+    summary="Evaluate rules and dispatch alerts",
+    response_description="Triggered alerts with current values and dispatch results per channel",
+)
 def evaluate_alerts(
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Evaluate alert rules against current metrics and dispatch notifications."""
+    """Evaluate all alert rules against live metrics and fire notifications.
+
+    For each rule that breaches its threshold, dispatches to configured
+    channels (Slack webhook, email, PagerDuty) and returns per-channel
+    send status.
+
+    Returns `evaluated_rules` count and a `results` list of triggered alerts.
+    Rules on cooldown are skipped.
+    """
     manager = _get_manager()
     collector = MetricsCollector()
     metrics = collector.collect()

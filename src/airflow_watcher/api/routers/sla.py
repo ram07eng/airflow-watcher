@@ -14,16 +14,34 @@ from airflow_watcher.utils.cache import MetricsCache
 router = APIRouter(prefix="/sla", tags=["sla"])
 
 
-@router.get("/misses")
+@router.get(
+    "/misses",
+    summary="List SLA miss events",
+    response_description="Paginated SLA miss records",
+)
 async def get_sla_misses(
-    dag_id: Optional[str] = Query(None, max_length=250),
-    hours: int = Query(24, ge=1, le=8760),
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    dag_id: Optional[str] = Query(
+        None, max_length=250,
+        description="Filter to a specific DAG ID. Leave blank for all DAGs.",
+        example="orders_daily",
+    ),
+    hours: int = Query(
+        24, ge=1, le=8760,
+        description="Lookback window in hours.",
+        example=24,
+    ),
+    limit: int = Query(50, ge=1, le=500, description="Page size.", example=50),
+    offset: int = Query(0, ge=0, description="Pagination offset.", example=0),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get SLA miss events."""
+    """Return individual SLA miss events within the lookback window.
+
+    Each row includes `dag_id`, `task_id`, `execution_date`, `duration`, and
+    the SLA definition that was breached.
+
+    Results are RBAC-filtered. Use `/sla/stats` for aggregate miss rates.
+    """
     if dag_id:
         check_dag_access(dag_id, allowed)
 
@@ -47,15 +65,28 @@ async def get_sla_misses(
     )
 
 
-@router.get("/stats")
+@router.get(
+    "/stats",
+    summary="Aggregate SLA miss statistics",
+    response_description="Miss rates, counts, and top DAGs/tasks with SLA breaches",
+)
 async def get_sla_stats(
-    hours: int = Query(24, ge=1, le=8760),
+    hours: int = Query(
+        24, ge=1, le=8760,
+        description="Lookback window in hours.",
+        example=24,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get SLA statistics.
+    """Aggregate SLA miss statistics over the lookback window.
 
-    Note: Aggregate counts are global. Per-DAG breakdowns are filtered by RBAC.
+    Returns:
+    - `total_misses`, `miss_rate`
+    - `top_dags_with_misses` — DAGs ranked by miss count (RBAC-filtered)
+    - `top_tasks_with_misses` — tasks ranked by miss count (RBAC-filtered)
+
+    Aggregate counts are global; per-DAG and per-task breakdowns are RBAC-filtered.
     """
     cache = MetricsCache.get_instance()
     cache_key = f"sla:stats:{hours}"

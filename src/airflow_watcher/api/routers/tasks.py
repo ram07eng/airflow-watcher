@@ -14,13 +14,25 @@ from airflow_watcher.utils.cache import MetricsCache
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
-@router.get("/long-running")
+@router.get(
+    "/long-running",
+    summary="Long-running task instances",
+    response_description="Task instances exceeding the elapsed-time threshold",
+)
 async def get_long_running_tasks(
-    threshold_minutes: int = Query(60, ge=1, le=10080),
+    threshold_minutes: int = Query(
+        60, ge=1, le=10080,
+        description="Minimum runtime in minutes to be flagged. Default 60 min.",
+        example=60,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get tasks running longer than the threshold, sorted by duration descending."""
+    """Return task instances currently running longer than `threshold_minutes`.
+
+    Results are sorted by duration descending.
+    Useful for spotting runaway tasks before they breach SLA.
+    """
     cache = MetricsCache.get_instance()
     cache_key = f"tasks:long-running:threshold={threshold_minutes}"
 
@@ -39,14 +51,30 @@ async def get_long_running_tasks(
     )
 
 
-@router.get("/retries")
+@router.get(
+    "/retries",
+    summary="Tasks with excessive retries",
+    response_description="Task instances that retried more than min_retries times",
+)
 async def get_retry_heavy_tasks(
-    hours: int = Query(24, ge=1, le=8760),
-    min_retries: int = Query(2, ge=1, le=100),
+    hours: int = Query(
+        24, ge=1, le=8760,
+        description="Lookback window in hours.",
+        example=24,
+    ),
+    min_retries: int = Query(
+        2, ge=1, le=100,
+        description="Minimum retry count threshold to be included.",
+        example=2,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get tasks with excessive retries."""
+    """Return tasks that retried at least `min_retries` times in the lookback window.
+
+    High retry counts often indicate flaky operators, transient infra issues,
+    or incorrect timeout/retry configs. RBAC-filtered.
+    """
     cache = MetricsCache.get_instance()
     cache_key = f"tasks:retries:hours={hours}&min={min_retries}"
 
@@ -64,13 +92,25 @@ async def get_retry_heavy_tasks(
     )
 
 
-@router.get("/zombies")
+@router.get(
+    "/zombies",
+    summary="Potential zombie task instances",
+    response_description="Tasks in running state longer than the zombie threshold",
+)
 async def get_zombie_tasks(
-    threshold_minutes: int = Query(120, ge=1, le=10080),
+    threshold_minutes: int = Query(
+        120, ge=1, le=10080,
+        description="Tasks running longer than this without a heartbeat are flagged as zombies.",
+        example=120,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get potential zombie tasks."""
+    """Return tasks that appear stuck in `running` state beyond `threshold_minutes`.
+
+    Zombies are workers that lost their heartbeat but were never marked failed.
+    They block slot capacity and may need manual intervention. RBAC-filtered.
+    """
     cache = MetricsCache.get_instance()
     cache_key = f"tasks:zombies:threshold={threshold_minutes}"
 
@@ -89,15 +129,27 @@ async def get_zombie_tasks(
     )
 
 
-@router.get("/failure-patterns")
+@router.get(
+    "/failure-patterns",
+    summary="Task failure pattern analysis",
+    response_description="Flaky vs consistently failing tasks with failure rates",
+)
 async def get_failure_patterns(
-    hours: int = Query(168, ge=1, le=8760),
+    hours: int = Query(
+        168, ge=1, le=8760,
+        description="Lookback window in hours. Default 168 h (7 days) for a meaningful pattern sample.",
+        example=168,
+    ),
     allowed: Optional[Set[str]] = Depends(get_allowed_dag_ids),
     _auth: Optional[str] = Depends(require_auth),
 ):
-    """Get task failure pattern analysis.
+    """Analyse task failure patterns over the lookback window.
 
-    Note: Per-task breakdowns are filtered by RBAC when enabled.
+    Distinguishes between:
+    - **Flaky tasks** — fail intermittently (high variance)
+    - **Consistently failing tasks** — fail on most or every run
+
+    `top_failing_tasks` and `flaky_tasks` are RBAC-filtered.
     """
     cache = MetricsCache.get_instance()
     cache_key = f"tasks:failure-patterns:hours={hours}"
