@@ -1,10 +1,6 @@
 name: Publish to PyPI
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [main]
   release:
     types: [published]
   workflow_dispatch:
@@ -24,11 +20,6 @@ jobs:
   build:
     name: Build & Publish
     runs-on: ubuntu-latest
-    # For workflow_run: only proceed if CI passed; always proceed for other triggers
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'release' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     environment: pypi
     permissions:
       id-token: write
