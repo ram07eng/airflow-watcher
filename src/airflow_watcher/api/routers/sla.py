@@ -21,12 +21,15 @@ router = APIRouter(prefix="/sla", tags=["sla"])
 )
 async def get_sla_misses(
     dag_id: Optional[str] = Query(
-        None, max_length=250,
+        None,
+        max_length=250,
         description="Filter to a specific DAG ID. Leave blank for all DAGs.",
         example="orders_daily",
     ),
     hours: int = Query(
-        24, ge=1, le=8760,
+        24,
+        ge=1,
+        le=8760,
         description="Lookback window in hours.",
         example=24,
     ),
@@ -72,7 +75,9 @@ async def get_sla_misses(
 )
 async def get_sla_stats(
     hours: int = Query(
-        24, ge=1, le=8760,
+        24,
+        ge=1,
+        le=8760,
         description="Lookback window in hours.",
         example=24,
     ),

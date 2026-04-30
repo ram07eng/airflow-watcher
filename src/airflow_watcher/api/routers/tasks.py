@@ -21,7 +21,9 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 )
 async def get_long_running_tasks(
     threshold_minutes: int = Query(
-        60, ge=1, le=10080,
+        60,
+        ge=1,
+        le=10080,
         description="Minimum runtime in minutes to be flagged. Default 60 min.",
         example=60,
     ),
@@ -58,12 +60,16 @@ async def get_long_running_tasks(
 )
 async def get_retry_heavy_tasks(
     hours: int = Query(
-        24, ge=1, le=8760,
+        24,
+        ge=1,
+        le=8760,
         description="Lookback window in hours.",
         example=24,
     ),
     min_retries: int = Query(
-        2, ge=1, le=100,
+        2,
+        ge=1,
+        le=100,
         description="Minimum retry count threshold to be included.",
         example=2,
     ),
@@ -99,7 +105,9 @@ async def get_retry_heavy_tasks(
 )
 async def get_zombie_tasks(
     threshold_minutes: int = Query(
-        120, ge=1, le=10080,
+        120,
+        ge=1,
+        le=10080,
         description="Tasks running longer than this without a heartbeat are flagged as zombies.",
         example=120,
     ),
@@ -136,7 +144,9 @@ async def get_zombie_tasks(
 )
 async def get_failure_patterns(
     hours: int = Query(
-        168, ge=1, le=8760,
+        168,
+        ge=1,
+        le=8760,
         description="Lookback window in hours. Default 168 h (7 days) for a meaningful pattern sample.",
         example=168,
     ),

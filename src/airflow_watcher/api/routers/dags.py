@@ -108,7 +108,9 @@ async def get_dag_complexity(
 )
 async def get_inactive_dags(
     days: int = Query(
-        30, ge=1, le=365,
+        30,
+        ge=1,
+        le=365,
         description="Flag DAGs with no run in this many days.",
         example=30,
     ),

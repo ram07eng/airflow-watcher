@@ -21,12 +21,16 @@ router = APIRouter(prefix="/scheduling", tags=["scheduling"])
 )
 async def get_scheduling_lag(
     hours: int = Query(
-        24, ge=1, le=8760,
+        24,
+        ge=1,
+        le=8760,
         description="Lookback window in hours.",
         example=24,
     ),
     threshold_minutes: int = Query(
-        10, ge=1, le=10080,
+        10,
+        ge=1,
+        le=10080,
         description="DAG runs with lag exceeding this are listed in `delayed_dags`.",
         example=10,
     ),
@@ -115,7 +119,9 @@ async def get_pool_utilization(
 )
 async def get_stale_dags(
     expected_interval_hours: int = Query(
-        24, ge=1, le=720,
+        24,
+        ge=1,
+        le=720,
         description="DAGs with no successful run in this many hours are flagged as stale.",
         example=24,
     ),

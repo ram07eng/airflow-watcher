@@ -28,7 +28,9 @@ def _is_standalone() -> bool:
 )
 async def get_upstream_failures(
     hours: int = Query(
-        24, ge=1, le=8760,
+        24,
+        ge=1,
+        le=8760,
         description="Lookback window in hours.",
         example=24,
     ),
@@ -107,7 +109,9 @@ async def get_cross_dag_dependencies(
 )
 async def get_failure_correlations(
     hours: int = Query(
-        24, ge=1, le=8760,
+        24,
+        ge=1,
+        le=8760,
         description="Lookback window in hours. Wider windows give stronger correlation signal.",
         example=24,
     ),

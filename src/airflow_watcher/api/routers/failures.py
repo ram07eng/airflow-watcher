@@ -21,12 +21,15 @@ router = APIRouter(prefix="/failures", tags=["failures"])
 )
 async def get_failures(
     dag_id: Optional[str] = Query(
-        None, max_length=250,
+        None,
+        max_length=250,
         description="Filter to a specific DAG ID. Leave blank for all DAGs.",
         example="payment_etl",
     ),
     hours: int = Query(
-        24, ge=1, le=8760,
+        24,
+        ge=1,
+        le=8760,
         description="Lookback window in hours. Default 24 h, max 8 760 (1 year).",
         example=24,
     ),
@@ -77,7 +80,9 @@ async def get_failures(
 )
 async def get_failure_stats(
     hours: int = Query(
-        24, ge=1, le=8760,
+        24,
+        ge=1,
+        le=8760,
         description="Lookback window in hours.",
         example=24,
     ),
