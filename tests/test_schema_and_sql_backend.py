@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # SchemaConfig
@@ -47,12 +46,13 @@ class TestSchemaConfigDefaults:
         assert s.col_task_id == "task_id"  # untouched default
 
     def test_from_env_unknown_key_warns(self, monkeypatch, caplog):
-        from airflow_watcher.backends.schema_config import SchemaConfig
         import logging
+
+        from airflow_watcher.backends.schema_config import SchemaConfig
 
         monkeypatch.setenv("AIRFLOW_WATCHER_SCHEMA_JSON", json.dumps({"no_such_field": "x"}))
         with caplog.at_level(logging.WARNING, logger="airflow_watcher.backends.schema_config"):
-            s = SchemaConfig.from_env()
+            SchemaConfig.from_env()
         assert "no_such_field" in caplog.text
 
     def test_from_env_invalid_json_raises(self, monkeypatch):

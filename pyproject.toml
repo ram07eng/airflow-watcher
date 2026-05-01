@@ -87,6 +87,14 @@ where = ["src"]
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+exclude = [
+    ".venv",
+    ".venv310",
+    "demo/dags",
+    "demo/load-tests",
+    "demo/bigquery/record_demo.py",
+    "demo/wait_ready.py",
+]
 
 [tool.ruff.format]
 quote-style = "double"

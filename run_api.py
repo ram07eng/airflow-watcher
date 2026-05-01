@@ -7,6 +7,7 @@ Usage:
 Starts the FastAPI server on the port configured in .env (default 8083).
 Does NOT require apache-airflow to be installed — uses lightweight stubs.
 """
+
 import os
 import sys
 
@@ -15,11 +16,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src
 
 # Install Airflow stubs if Airflow is not installed
 from airflow_watcher.api.compat import install_airflow_stubs, reflect_airflow_models
+
 install_airflow_stubs()
 
-from airflow_watcher.api.main import create_app
-from airflow_watcher.api.db import get_engine
-import uvicorn
+import uvicorn  # noqa: E402
+
+from airflow_watcher.api.db import get_engine  # noqa: E402
+from airflow_watcher.api.main import create_app  # noqa: E402
 
 app, cfg = create_app()
 
