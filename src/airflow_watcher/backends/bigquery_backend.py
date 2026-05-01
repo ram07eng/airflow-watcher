@@ -17,7 +17,7 @@ return safe empty values with a ``backend_note`` key.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class ExternalBackend:
         return [_Row(r) for r in rows]
 
     def get_failure_statistics(self, *, lookback_hours: int = 24) -> Dict[str, Any]:
-        return self._client.get_failure_statistics(lookback_hours=lookback_hours)
+        return cast(Dict[str, Any], self._client.get_failure_statistics(lookback_hours=lookback_hours))
 
     # ==================================================================
     # SLA monitor interface
@@ -104,7 +104,7 @@ class ExternalBackend:
     # ==================================================================
 
     def get_long_running_tasks(self, *, threshold_minutes: int = 60) -> List[Dict[str, Any]]:
-        return self._client.get_long_running_tasks(threshold_minutes=threshold_minutes)
+        return cast(List[Dict[str, Any]], self._client.get_long_running_tasks(threshold_minutes=threshold_minutes))
 
     def get_retry_heavy_tasks(self, *, lookback_hours: int = 24, min_retries: int = 2) -> List[Dict[str, Any]]:
         return []
@@ -142,9 +142,12 @@ class ExternalBackend:
         lookback_hours: int = 24,
         lag_threshold_minutes: int = 10,
     ) -> Dict[str, Any]:
-        return self._client.get_scheduling_lag(
-            lookback_hours=lookback_hours,
-            lag_threshold_minutes=lag_threshold_minutes,
+        return cast(
+            Dict[str, Any],
+            self._client.get_scheduling_lag(
+                lookback_hours=lookback_hours,
+                lag_threshold_minutes=lag_threshold_minutes,
+            ),
         )
 
     def get_queued_tasks(self) -> Dict[str, Any]:
@@ -265,7 +268,7 @@ class ExternalBackend:
         return []
 
     def get_failure_correlation(self, *, lookback_hours: int = 24) -> Dict[str, Any]:
-        return self._client.get_failure_correlations(lookback_hours=lookback_hours)
+        return cast(Dict[str, Any], self._client.get_failure_correlations(lookback_hours=lookback_hours))
 
     def get_cascading_failure_impact(self, *, dag_id: str, task_id: str) -> Dict[str, Any]:
         return {

@@ -88,10 +88,10 @@ def _build_schema(config, dialect: str, structure: str):
     return SchemaConfig.from_env(table=table, dialect=dialect, structure=structure)
 
 
-def _make_bigquery_backend(config):
+def _make_bigquery_backend(config) -> object:
     """Instantiate ExternalBackend backed by BQClient."""
-    from airflow_watcher.backends.bigquery_backend import ExternalBackend
     from airflow_watcher.backends._bq_client import BQClient
+    from airflow_watcher.backends.bigquery_backend import ExternalBackend
 
     bq_table = getattr(config, "bq_table", None)
     if not bq_table:
@@ -101,7 +101,7 @@ def _make_bigquery_backend(config):
             "Set it to the fully-qualified table name:  project.dataset.table"
         )
 
-    structure = getattr(config, "bq_structure", None) or os.environ.get("AIRFLOW_WATCHER_BQ_STRUCTURE", "nested_array")
+    structure = str(getattr(config, "bq_structure", None) or os.environ.get("AIRFLOW_WATCHER_BQ_STRUCTURE", "nested_array"))
     schema = _build_schema(config, dialect="bigquery", structure=structure)
     schema.table = bq_table  # ensure table is set
 
@@ -109,10 +109,10 @@ def _make_bigquery_backend(config):
     return ExternalBackend(client=client, backend_label="bigquery")
 
 
-def _make_sqlalchemy_backend(config):
+def _make_sqlalchemy_backend(config) -> object:
     """Instantiate ExternalBackend backed by SQLClient."""
-    from airflow_watcher.backends.bigquery_backend import ExternalBackend
     from airflow_watcher.backends._sql_client import SQLClient
+    from airflow_watcher.backends.bigquery_backend import ExternalBackend
 
     db_uri = getattr(config, "external_db_uri", None) or os.environ.get("AIRFLOW_WATCHER_EXTERNAL_DB_URI", "")
     if not db_uri:
