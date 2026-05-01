@@ -1,7 +1,7 @@
 """Slack Notifier for Airflow Watcher alerts."""
 
 import logging
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -46,18 +46,18 @@ class SlackNotifier:
 
         try:
             if self.webhook_client:
-                response = self.webhook_client.send(
+                response: Any = self.webhook_client.send(
                     text=f"🚨 DAG Failed: {failure.dag_id}",
                     blocks=blocks,
                 )
-                return response.status_code == 200
+                return bool(response.status_code == 200)
             elif self.web_client and self.config.slack_channel:
                 response = self.web_client.chat_postMessage(
                     channel=self.config.slack_channel,
-                    text=f"🚨 DAG Failed: {failure.dag_id}",
+                    text=f"\U0001f6a8 DAG Failed: {failure.dag_id}",
                     blocks=blocks,
                 )
-                return response["ok"]
+                return bool(response["ok"])
         except SlackApiError as e:
             logger.error(f"Failed to send Slack alert: {e}")
             return False
@@ -78,18 +78,18 @@ class SlackNotifier:
 
         try:
             if self.webhook_client:
-                response = self.webhook_client.send(
+                response: Any = self.webhook_client.send(
                     text=f"⏰ SLA Miss: {sla_miss.dag_id}/{sla_miss.task_id}",
                     blocks=blocks,
                 )
-                return response.status_code == 200
+                return bool(response.status_code == 200)
             elif self.web_client and self.config.slack_channel:
                 response = self.web_client.chat_postMessage(
                     channel=self.config.slack_channel,
-                    text=f"⏰ SLA Miss: {sla_miss.dag_id}/{sla_miss.task_id}",
+                    text=f"\u23f0 SLA Miss: {sla_miss.dag_id}/{sla_miss.task_id}",
                     blocks=blocks,
                 )
-                return response["ok"]
+                return bool(response["ok"])
         except SlackApiError as e:
             logger.error(f"Failed to send Slack alert: {e}")
             return False
@@ -109,7 +109,7 @@ class SlackNotifier:
         if not failures:
             return True
 
-        blocks = [
+        blocks: list[dict[str, Any]] = [
             {
                 "type": "header",
                 "text": {
@@ -149,18 +149,18 @@ class SlackNotifier:
 
         try:
             if self.webhook_client:
-                response = self.webhook_client.send(
+                response: Any = self.webhook_client.send(
                     text=f"🚨 {len(failures)} DAG Failures",
                     blocks=blocks,
                 )
-                return response.status_code == 200
+                return bool(response.status_code == 200)
             elif self.web_client and self.config.slack_channel:
                 response = self.web_client.chat_postMessage(
                     channel=self.config.slack_channel,
-                    text=f"🚨 {len(failures)} DAG Failures",
+                    text=f"\U0001f6a8 {len(failures)} DAG Failures",
                     blocks=blocks,
                 )
-                return response["ok"]
+                return bool(response["ok"])
         except SlackApiError as e:
             logger.error(f"Failed to send Slack summary: {e}")
             return False
@@ -272,7 +272,7 @@ class SlackNotifier:
 
         emoji = severity_emoji.get(severity, "⚠️")
 
-        blocks = [
+        blocks: list[dict[str, Any]] = [
             {
                 "type": "header",
                 "text": {
@@ -294,18 +294,18 @@ class SlackNotifier:
 
         try:
             if self.webhook_client:
-                response = self.webhook_client.send(
+                response: Any = self.webhook_client.send(
                     text=f"{emoji} Threshold Alert: {metric_name} = {current_value}",
                     blocks=blocks,
                 )
-                return response.status_code == 200
+                return bool(response.status_code == 200)
             elif self.web_client and self.config.slack_channel:
                 response = self.web_client.chat_postMessage(
                     channel=self.config.slack_channel,
                     text=f"{emoji} Threshold Alert: {metric_name} = {current_value}",
                     blocks=blocks,
                 )
-                return response["ok"]
+                return bool(response["ok"])
         except SlackApiError as e:
             logger.error(f"Failed to send Slack threshold alert: {e}")
             return False
@@ -318,7 +318,7 @@ class SlackNotifier:
         Returns:
             True if test alert was sent successfully
         """
-        blocks = [
+        blocks: list[dict[str, Any]] = [
             {
                 "type": "header",
                 "text": {
@@ -338,18 +338,18 @@ class SlackNotifier:
 
         try:
             if self.webhook_client:
-                response = self.webhook_client.send(
+                response: Any = self.webhook_client.send(
                     text="✅ Airflow Watcher Test Alert",
                     blocks=blocks,
                 )
-                return response.status_code == 200
+                return bool(response.status_code == 200)
             elif self.web_client and self.config.slack_channel:
                 response = self.web_client.chat_postMessage(
                     channel=self.config.slack_channel,
-                    text="✅ Airflow Watcher Test Alert",
+                    text="\u2705 Airflow Watcher Test Alert",
                     blocks=blocks,
                 )
-                return response["ok"]
+                return bool(response["ok"])
         except SlackApiError as e:
             logger.error(f"Failed to send Slack test alert: {e}")
             return False

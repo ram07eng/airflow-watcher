@@ -3,12 +3,14 @@
 from airflow.utils import timezone
 from flask import Blueprint, jsonify, request
 
-from airflow_watcher.monitors.dag_failure_monitor import DAGFailureMonitor
-from airflow_watcher.monitors.dag_health_monitor import DAGHealthMonitor
-from airflow_watcher.monitors.dependency_monitor import DependencyMonitor
-from airflow_watcher.monitors.scheduling_monitor import SchedulingMonitor
-from airflow_watcher.monitors.sla_monitor import SLAMonitor
-from airflow_watcher.monitors.task_health_monitor import TaskHealthMonitor
+from airflow_watcher.api.monitor_provider import (
+    get_dag_health_monitor,
+    get_dependency_monitor,
+    get_failure_monitor,
+    get_scheduling_monitor,
+    get_sla_monitor,
+    get_task_monitor,
+)
 from airflow_watcher.utils.rbac import filter_results_rbac, get_accessible_dag_ids
 
 watcher_api_blueprint = Blueprint("watcher_api", __name__, url_prefix="/api/watcher")
@@ -29,7 +31,7 @@ def _safe_int(value, default: int, min_val: int = 1, max_val: int = 10000) -> in
 @watcher_api_blueprint.route("/failures", methods=["GET"])
 def get_failures():
     """Get recent DAG failures via API."""
-    failure_monitor = DAGFailureMonitor()
+    failure_monitor = get_failure_monitor()
     allowed_dags = get_accessible_dag_ids()
 
     dag_id = request.args.get("dag_id")
@@ -56,7 +58,7 @@ def get_failures():
 @watcher_api_blueprint.route("/failures/stats", methods=["GET"])
 def get_failure_stats():
     """Get failure statistics via API."""
-    failure_monitor = DAGFailureMonitor()
+    failure_monitor = get_failure_monitor()
 
     hours = _safe_int(request.args.get("hours"), 24)
     stats = failure_monitor.get_failure_statistics(lookback_hours=hours)
@@ -73,7 +75,7 @@ def get_failure_stats():
 @watcher_api_blueprint.route("/sla/misses", methods=["GET"])
 def get_sla_misses():
     """Get SLA misses via API."""
-    sla_monitor = SLAMonitor()
+    sla_monitor = get_sla_monitor()
     allowed_dags = get_accessible_dag_ids()
 
     dag_id = request.args.get("dag_id")
@@ -100,7 +102,7 @@ def get_sla_misses():
 @watcher_api_blueprint.route("/sla/stats", methods=["GET"])
 def get_sla_stats():
     """Get SLA statistics via API."""
-    sla_monitor = SLAMonitor()
+    sla_monitor = get_sla_monitor()
 
     hours = _safe_int(request.args.get("hours"), 24)
     stats = sla_monitor.get_sla_statistics(lookback_hours=hours)
@@ -121,8 +123,8 @@ def get_health():
     Suitable for external monitoring tools (e.g. Datadog, Prometheus alertmanager,
     uptime checkers) to poll. Returns HTTP 200 when healthy, 503 when degraded.
     """
-    dag_monitor = DAGHealthMonitor()
-    failure_monitor = DAGFailureMonitor()
+    dag_monitor = get_dag_health_monitor()
+    failure_monitor = get_failure_monitor()
 
     try:
         dag_summary = dag_monitor.get_dag_status_summary()
@@ -164,8 +166,8 @@ def get_dag_health(dag_id: str):
     if allowed_dags is not None and dag_id not in allowed_dags:
         return jsonify({"status": "error", "message": "Access denied"}), 403
 
-    failure_monitor = DAGFailureMonitor()
-    sla_monitor = SLAMonitor()
+    failure_monitor = get_failure_monitor()
+    sla_monitor = get_sla_monitor()
 
     dag_failures = failure_monitor.get_recent_failures(dag_id=dag_id, limit=10)
     dag_sla_misses = sla_monitor.get_recent_sla_misses(dag_id=dag_id, limit=10)
@@ -191,7 +193,7 @@ def get_dag_health(dag_id: str):
 @watcher_api_blueprint.route("/tasks/long-running", methods=["GET"])
 def get_long_running_tasks():
     """Get tasks running longer than expected."""
-    monitor = TaskHealthMonitor()
+    monitor = get_task_monitor()
     allowed_dags = get_accessible_dag_ids()
     threshold = _safe_int(request.args.get("threshold_minutes"), 60)
 
@@ -214,7 +216,7 @@ def get_long_running_tasks():
 @watcher_api_blueprint.route("/tasks/retries", methods=["GET"])
 def get_retry_heavy_tasks():
     """Get tasks with excessive retries."""
-    monitor = TaskHealthMonitor()
+    monitor = get_task_monitor()
     hours = _safe_int(request.args.get("hours"), 24)
     min_retries = _safe_int(request.args.get("min_retries"), 2)
 
@@ -236,7 +238,7 @@ def get_retry_heavy_tasks():
 @watcher_api_blueprint.route("/tasks/zombies", methods=["GET"])
 def get_zombie_tasks():
     """Get potential zombie tasks."""
-    monitor = TaskHealthMonitor()
+    monitor = get_task_monitor()
     threshold = _safe_int(request.args.get("threshold_minutes"), 120)
 
     zombies = monitor.get_zombie_tasks(zombie_threshold_minutes=threshold)
@@ -258,7 +260,7 @@ def get_zombie_tasks():
 @watcher_api_blueprint.route("/tasks/failure-patterns", methods=["GET"])
 def get_task_failure_patterns():
     """Get task failure pattern analysis."""
-    monitor = TaskHealthMonitor()
+    monitor = get_task_monitor()
     hours = _safe_int(request.args.get("hours"), 168)
 
     patterns = monitor.get_task_failure_patterns(lookback_hours=hours)
@@ -278,7 +280,7 @@ def get_task_failure_patterns():
 @watcher_api_blueprint.route("/scheduling/lag", methods=["GET"])
 def get_scheduling_lag():
     """Get scheduling lag analysis."""
-    monitor = SchedulingMonitor()
+    monitor = get_scheduling_monitor()
     hours = _safe_int(request.args.get("hours"), 24)
     threshold = _safe_int(request.args.get("threshold_minutes"), 10)
 
@@ -299,7 +301,7 @@ def get_scheduling_lag():
 @watcher_api_blueprint.route("/scheduling/queue", methods=["GET"])
 def get_queue_status():
     """Get current queue status."""
-    monitor = SchedulingMonitor()
+    monitor = get_scheduling_monitor()
 
     queue_data = monitor.get_queued_tasks()
 
@@ -315,7 +317,7 @@ def get_queue_status():
 @watcher_api_blueprint.route("/scheduling/pools", methods=["GET"])
 def get_pool_utilization():
     """Get pool utilization stats."""
-    monitor = SchedulingMonitor()
+    monitor = get_scheduling_monitor()
 
     pools = monitor.get_pool_utilization()
 
@@ -334,7 +336,7 @@ def get_pool_utilization():
 @watcher_api_blueprint.route("/scheduling/stale-dags", methods=["GET"])
 def get_stale_dags():
     """Get DAGs that haven't run when expected."""
-    monitor = SchedulingMonitor()
+    monitor = get_scheduling_monitor()
     hours = _safe_int(request.args.get("expected_interval_hours"), 24)
 
     stale = monitor.get_stale_dags(expected_interval_hours=hours)
@@ -354,7 +356,7 @@ def get_stale_dags():
 @watcher_api_blueprint.route("/scheduling/concurrent", methods=["GET"])
 def get_concurrent_runs():
     """Get DAGs with multiple concurrent runs."""
-    monitor = SchedulingMonitor()
+    monitor = get_scheduling_monitor()
 
     concurrent = monitor.get_concurrent_runs()
 
@@ -373,7 +375,7 @@ def get_concurrent_runs():
 @watcher_api_blueprint.route("/dags/import-errors", methods=["GET"])
 def get_import_errors():
     """Get DAG import/parse errors."""
-    monitor = DAGHealthMonitor()
+    monitor = get_dag_health_monitor()
 
     errors = monitor.get_dag_import_errors()
 
@@ -392,7 +394,7 @@ def get_import_errors():
 @watcher_api_blueprint.route("/dags/status-summary", methods=["GET"])
 def get_dag_status_summary():
     """Get overall DAG status summary."""
-    monitor = DAGHealthMonitor()
+    monitor = get_dag_health_monitor()
 
     summary = monitor.get_dag_status_summary()
 
@@ -408,7 +410,7 @@ def get_dag_status_summary():
 @watcher_api_blueprint.route("/dags/complexity", methods=["GET"])
 def get_dag_complexity():
     """Get DAG complexity analysis."""
-    monitor = DAGHealthMonitor()
+    monitor = get_dag_health_monitor()
 
     complexity = monitor.get_dag_complexity_analysis()
 
@@ -427,7 +429,7 @@ def get_dag_complexity():
 @watcher_api_blueprint.route("/dags/inactive", methods=["GET"])
 def get_inactive_dags():
     """Get inactive DAGs."""
-    monitor = DAGHealthMonitor()
+    monitor = get_dag_health_monitor()
     days = _safe_int(request.args.get("days"), 30)
 
     inactive = monitor.get_inactive_dags(inactive_days=days)
@@ -452,7 +454,7 @@ def get_inactive_dags():
 @watcher_api_blueprint.route("/dependencies/upstream-failures", methods=["GET"])
 def get_upstream_failures():
     """Get tasks in upstream_failed state."""
-    monitor = DependencyMonitor()
+    monitor = get_dependency_monitor()
     hours = _safe_int(request.args.get("hours"), 24)
 
     failures = monitor.get_upstream_failures(lookback_hours=hours)
@@ -473,7 +475,7 @@ def get_upstream_failures():
 @watcher_api_blueprint.route("/dependencies/cross-dag", methods=["GET"])
 def get_cross_dag_dependencies():
     """Get cross-DAG dependencies."""
-    monitor = DependencyMonitor()
+    monitor = get_dependency_monitor()
 
     dependencies = monitor.get_cross_dag_dependencies()
 
@@ -492,7 +494,7 @@ def get_cross_dag_dependencies():
 @watcher_api_blueprint.route("/dependencies/correlations", methods=["GET"])
 def get_failure_correlations():
     """Get failure correlations between DAGs."""
-    monitor = DependencyMonitor()
+    monitor = get_dependency_monitor()
     hours = _safe_int(request.args.get("hours"), 24)
 
     correlations = monitor.get_failure_correlation(lookback_hours=hours)
@@ -513,7 +515,7 @@ def get_task_failure_impact(dag_id: str, task_id: str):
     if allowed_dags is not None and dag_id not in allowed_dags:
         return jsonify({"status": "error", "message": "Access denied"}), 403
 
-    monitor = DependencyMonitor()
+    monitor = get_dependency_monitor()
 
     impact = monitor.get_cascading_failure_impact(dag_id=dag_id, task_id=task_id)
 
@@ -532,11 +534,11 @@ def get_task_failure_impact(dag_id: str, task_id: str):
 @watcher_api_blueprint.route("/overview", methods=["GET"])
 def get_full_overview():
     """Get comprehensive monitoring overview."""
-    failure_monitor = DAGFailureMonitor()
-    sla_monitor = SLAMonitor()
-    task_monitor = TaskHealthMonitor()
-    scheduling_monitor = SchedulingMonitor()
-    dag_monitor = DAGHealthMonitor()
+    failure_monitor = get_failure_monitor()
+    sla_monitor = get_sla_monitor()
+    task_monitor = get_task_monitor()
+    scheduling_monitor = get_scheduling_monitor()
+    dag_monitor = get_dag_health_monitor()
 
     return jsonify(
         {

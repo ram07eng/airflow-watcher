@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 # Set ``AIRFLOW_WATCHER_RBAC_FAIL_OPEN=true`` to allow access on lookup errors.
 # Default is **closed** — deny access when permissions cannot be resolved.
 RBAC_FAIL_OPEN: bool = os.environ.get("AIRFLOW_WATCHER_RBAC_FAIL_OPEN", "false").lower() in (
-    "true", "1", "yes",
+    "true",
+    "1",
+    "yes",
 )
 
 
@@ -82,8 +84,9 @@ def get_accessible_dag_ids(user: Any = None) -> Optional[Set[str]]:
             return readable_dags
 
     except Exception:
-        logger.warning("RBAC: Could not resolve DAG permissions, failing %s",
-                        "open" if RBAC_FAIL_OPEN else "closed", exc_info=True)
+        logger.warning(
+            "RBAC: Could not resolve DAG permissions, failing %s", "open" if RBAC_FAIL_OPEN else "closed", exc_info=True
+        )
         if RBAC_FAIL_OPEN:
             return None  # Fail open — don't break the dashboard
         return set()  # Fail closed — deny all DAG access

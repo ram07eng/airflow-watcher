@@ -31,6 +31,7 @@ if str(_here) not in sys.path:
     sys.path.insert(0, str(_here))
 
 from bq_client import BQClient  # noqa: E402
+from airflow_watcher.backends.schema_config import SchemaConfig  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _bq: Optional[BQClient] = None
 _start_time: float = 0.0
-_BQ_TABLE = os.getenv(
-    "BQ_TABLE",
-    "just-data.production_je_monitoring.morpheusdbtresult_all_2026",
-)
+# Prefer the new package env var; fall back to legacy BQ_TABLE for compat.
+_BQ_TABLE = os.getenv("AIRFLOW_WATCHER_BQ_TABLE") or os.getenv("BQ_TABLE") or ""
 
 # ---------------------------------------------------------------------------
 # Tag metadata — shown as sections in Swagger UI
@@ -124,7 +123,14 @@ def error(message: str, status_code: int = 500) -> JSONResponse:
 async def lifespan(app: FastAPI):
     global _bq, _start_time
     _start_time = time.monotonic()
-    _bq = BQClient(table=_BQ_TABLE)
+    if not _BQ_TABLE:
+        raise RuntimeError("Set AIRFLOW_WATCHER_BQ_TABLE (or legacy BQ_TABLE) before starting the demo.")
+    schema = SchemaConfig.from_env(
+        table=_BQ_TABLE,
+        dialect="bigquery",
+        structure="nested_array",
+    )
+    _bq = BQClient(schema=schema)
     logger.info("BQ PoC started — table: %s", _BQ_TABLE)
     yield
     logger.info("BQ PoC shutting down")
@@ -161,9 +167,8 @@ Each row represents one dbt task invocation and contains the full
 
 ## Data source
 
-```
-just-data.production_je_monitoring.morpheusdbtresult_all_2026
-```
+Configured via `AIRFLOW_WATCHER_BQ_TABLE` environment variable.
+Column mappings can be overridden with `AIRFLOW_WATCHER_SCHEMA_JSON`.
 
 All queries use parameterised SQL and read-only credentials.
 """
@@ -656,16 +661,15 @@ async def get_task_graph(
     if _bq is None:
         raise HTTPException(status_code=503, detail="BigQuery client not initialised")
     if run_id is None:
-        from google.cloud import bigquery as _bq_mod
-
+        s = _bq._s
         sql = f"""
-        SELECT run_id
-        FROM `{_BQ_TABLE}`
-        WHERE dag_id = @dag_id
-        ORDER BY execution_date DESC
+        SELECT {s.col_run_id}
+        FROM `{s.table}`
+        WHERE {s.col_dag_id} = @dag_id
+        ORDER BY {s.col_execution_date} DESC
         LIMIT 1
         """
-        params = [_bq_mod.ScalarQueryParameter("dag_id", "STRING", dag_id)]
+        params = [_bq._bq.ScalarQueryParameter("dag_id", "STRING", dag_id)]
         rows = _bq._run(sql, params)
         if not rows:
             return error(f"No runs found for dag_id={dag_id}", 404)

@@ -1,18 +1,16 @@
 """Dependency Monitor - Tracks upstream/downstream failures and cascading issues."""
 
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Set
 import logging
-from airflow.utils import timezone
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Set
 
-from airflow.models import DagRun, TaskInstance, DagModel
-from airflow.utils.state import DagRunState, TaskInstanceState
+from airflow.models import DagModel, DagRun, TaskInstance
+from airflow.utils import timezone
 from airflow.utils.session import provide_session
+from airflow.utils.state import DagRunState, TaskInstanceState
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from airflow_watcher.config import WatcherConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -28,34 +26,40 @@ class DependencyMonitor:
     def get_upstream_failures(
         self,
         lookback_hours: int = 24,
-        session: Session = None,
+        session: Session = None,  # type: ignore[assignment]
     ) -> List[Dict]:
         """Find tasks in upstream_failed state.
-        
+
         Args:
             lookback_hours: Hours to look back
             session: SQLAlchemy session
-            
+
         Returns:
             List of upstream failed tasks
         """
         cutoff = timezone.utcnow() - timedelta(hours=lookback_hours)
-        
-        query = session.query(TaskInstance).filter(
-            TaskInstance.state == TaskInstanceState.UPSTREAM_FAILED,
-            TaskInstance.end_date >= cutoff,
-        ).order_by(TaskInstance.end_date.desc())
-        
+
+        query = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.state == TaskInstanceState.UPSTREAM_FAILED,
+                TaskInstance.end_date >= cutoff,
+            )
+            .order_by(TaskInstance.end_date.desc())
+        )
+
         upstream_failures = []
         for ti in query.limit(100).all():
-            upstream_failures.append({
-                "dag_id": ti.dag_id,
-                "task_id": ti.task_id,
-                "run_id": ti.run_id,
-                "execution_date": ti.execution_date.isoformat() if ti.execution_date else None,
-                "timestamp": ti.end_date.isoformat() if ti.end_date else None,
-            })
-        
+            upstream_failures.append(
+                {
+                    "dag_id": ti.dag_id,
+                    "task_id": ti.task_id,
+                    "run_id": ti.run_id,
+                    "execution_date": ti.execution_date.isoformat() if ti.execution_date else None,
+                    "timestamp": ti.end_date.isoformat() if ti.end_date else None,
+                }
+            )
+
         return upstream_failures
 
     @provide_session
@@ -63,37 +67,37 @@ class DependencyMonitor:
         self,
         dag_id: str,
         task_id: str,
-        session: Session = None,
+        session: Session = None,  # type: ignore[assignment]
     ) -> Dict:
         """Analyze the downstream impact of a task failure.
-        
+
         Args:
             dag_id: DAG ID
             task_id: Failed task ID
             session: SQLAlchemy session
-            
+
         Returns:
             Dictionary with impact analysis
         """
         from airflow.models import DagBag
-        
+
         try:
             dagbag = DagBag(include_examples=False, read_dags_from_db=True)
             dag = dagbag.get_dag(dag_id)
         except Exception as e:
             logger.error(f"Failed to load DAG {dag_id}: {e}")
             return {"error": str(e)}
-        
+
         if not dag:
             return {"error": f"DAG {dag_id} not found"}
-        
+
         task = dag.get_task(task_id)
         if not task:
             return {"error": f"Task {task_id} not found in DAG {dag_id}"}
-        
+
         # Get all downstream tasks recursively
         affected_tasks = self._get_all_downstream(task, set())
-        
+
         return {
             "dag_id": dag_id,
             "failed_task": task_id,
@@ -106,45 +110,43 @@ class DependencyMonitor:
     def _get_all_downstream(self, task, visited: Set[str]) -> Set[str]:
         """Recursively get all downstream tasks."""
         downstream_ids = set()
-        
+
         for downstream in task.downstream_list:
             if downstream.task_id not in visited:
                 visited.add(downstream.task_id)
                 downstream_ids.add(downstream.task_id)
                 downstream_ids.update(self._get_all_downstream(downstream, visited))
-        
+
         return downstream_ids
 
     @provide_session
-    def get_cross_dag_dependencies(self, limit: int = 200, session: Session = None) -> List[Dict]:
+    def get_cross_dag_dependencies(
+        self,
+        limit: int = 200,
+        session: Session = None,  # type: ignore[assignment]
+    ) -> List[Dict]:
         """Identify cross-DAG dependencies using ExternalTaskSensor.
-        
+
         Args:
             limit: Maximum number of DAGs to inspect
             session: SQLAlchemy session
-            
+
         Returns:
             List of cross-DAG dependencies
         """
         from airflow.models import DagBag
-        
+
         # Query active DAG IDs from metadata (lightweight)
-        dag_ids = [
-            row.dag_id for row in
-            session.query(DagModel.dag_id)
-            .filter(DagModel.is_active == True)
-            .limit(limit)
-            .all()
-        ]
-        
+        dag_ids = [row.dag_id for row in session.query(DagModel.dag_id).filter(DagModel.is_active).limit(limit).all()]
+
         try:
             dagbag = DagBag(include_examples=False, read_dags_from_db=True)
         except Exception as e:
             logger.error(f"Failed to load DagBag: {e}")
             return []
-        
+
         dependencies = []
-        
+
         for dag_id in dag_ids:
             try:
                 dag = dagbag.get_dag(dag_id)
@@ -152,40 +154,44 @@ class DependencyMonitor:
                 continue
             if not dag:
                 continue
-            
+
             for task in dag.tasks:
                 # Check for ExternalTaskSensor (robust: check class name hierarchy)
-                task_class_name = getattr(task, 'task_type', '') or type(task).__name__
+                task_class_name = getattr(task, "task_type", "") or type(task).__name__
                 if task_class_name in ("ExternalTaskSensor", "ExternalTaskMarker"):
                     try:
-                        external_dag_id = getattr(task, 'external_dag_id', None)
-                        external_task_id = getattr(task, 'external_task_id', None)
-                        
+                        external_dag_id = getattr(task, "external_dag_id", None)
+                        external_task_id = getattr(task, "external_task_id", None)
+
                         if external_dag_id:
-                            dependencies.append({
-                                "dag_id": dag_id,
-                                "task_id": task.task_id,
-                                "depends_on_dag": external_dag_id,
-                                "depends_on_task": external_task_id,
-                                "dependency_type": "ExternalTaskSensor",
-                            })
+                            dependencies.append(
+                                {
+                                    "dag_id": dag_id,
+                                    "task_id": task.task_id,
+                                    "depends_on_dag": external_dag_id,
+                                    "depends_on_task": external_task_id,
+                                    "dependency_type": "ExternalTaskSensor",
+                                }
+                            )
                     except Exception:
                         pass
-                
+
                 # Check for TriggerDagRunOperator
                 if task.task_type in ("TriggerDagRunOperator", "TriggerDagRun"):
                     try:
-                        trigger_dag_id = getattr(task, 'trigger_dag_id', None)
+                        trigger_dag_id = getattr(task, "trigger_dag_id", None)
                         if trigger_dag_id:
-                            dependencies.append({
-                                "dag_id": dag_id,
-                                "task_id": task.task_id,
-                                "triggers_dag": trigger_dag_id,
-                                "dependency_type": "TriggerDagRunOperator",
-                            })
+                            dependencies.append(
+                                {
+                                    "dag_id": dag_id,
+                                    "task_id": task.task_id,
+                                    "triggers_dag": trigger_dag_id,
+                                    "dependency_type": "TriggerDagRunOperator",
+                                }
+                            )
                     except Exception:
                         pass
-        
+
         return dependencies
 
     @provide_session
@@ -193,39 +199,43 @@ class DependencyMonitor:
         self,
         dag_id: str,
         execution_date: datetime,
-        session: Session = None,
+        session: Session = None,  # type: ignore[assignment]
     ) -> Dict:
         """Get status of all tasks in a DAG run's dependency chain.
-        
+
         Args:
             dag_id: DAG ID
             execution_date: Execution date to check
             session: SQLAlchemy session
-            
+
         Returns:
             Dictionary with dependency chain status
         """
         # Get all task instances for this run
-        task_instances = session.query(TaskInstance).filter(
-            TaskInstance.dag_id == dag_id,
-            TaskInstance.execution_date == execution_date,
-        ).all()
-        
+        task_instances = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.dag_id == dag_id,
+                TaskInstance.execution_date == execution_date,
+            )
+            .all()
+        )
+
         if not task_instances:
             return {"error": "No task instances found"}
-        
+
         # Group by state
-        state_counts = {}
-        tasks_by_state = {}
-        
+        state_counts: Dict[str, int] = {}
+        tasks_by_state: Dict[str, list] = {}
+
         for ti in task_instances:
             state = str(ti.state)
             state_counts[state] = state_counts.get(state, 0) + 1
-            
+
             if state not in tasks_by_state:
                 tasks_by_state[state] = []
             tasks_by_state[state].append(ti.task_id)
-        
+
         # Identify bottlenecks (running tasks with queued downstream)
         bottlenecks = []
         for ti in task_instances:
@@ -234,7 +244,7 @@ class DependencyMonitor:
                 # This is simplified - real implementation would check actual dependencies
                 if state_counts.get(str(TaskInstanceState.SCHEDULED), 0) > 0:
                     bottlenecks.append(ti.task_id)
-        
+
         return {
             "dag_id": dag_id,
             "execution_date": execution_date.isoformat(),
@@ -246,60 +256,63 @@ class DependencyMonitor:
             "timestamp": timezone.utcnow().isoformat(),
         }
 
-    @provide_session  
+    @provide_session
     def get_failure_correlation(
         self,
         lookback_hours: int = 24,
-        session: Session = None,
+        session: Session = None,  # type: ignore[assignment]
     ) -> Dict:
         """Find DAGs that often fail together (potential shared dependencies).
-        
+
         Args:
             lookback_hours: Hours to analyze
             session: SQLAlchemy session
-            
+
         Returns:
             Dictionary with failure correlations
         """
         cutoff = timezone.utcnow() - timedelta(hours=lookback_hours)
-        
+
         # Get failed DAG runs with timestamps
-        failed_runs = session.query(DagRun).filter(
-            DagRun.state == DagRunState.FAILED,
-            DagRun.end_date >= cutoff,
-        ).order_by(DagRun.end_date).all()
-        
+        failed_runs = (
+            session.query(DagRun)
+            .filter(
+                DagRun.state == DagRunState.FAILED,
+                DagRun.end_date >= cutoff,
+            )
+            .order_by(DagRun.end_date)
+            .all()
+        )
+
         if len(failed_runs) < 2:
             return {
                 "period_hours": lookback_hours,
                 "correlations": [],
                 "message": "Not enough failures to analyze correlations",
             }
-        
+
         # Find failures that happened within 10 minutes of each other.
         # Uses a sorted-by-time list with a sliding window and dict-keyed
         # pair lookup for O(n·w) instead of O(n²·k).
         window_minutes = 10
         pair_map: Dict[tuple, dict] = {}  # (dag_a, dag_b) -> correlation dict
-        
+
         for i, run1 in enumerate(failed_runs):
             for j in range(i + 1, len(failed_runs)):
                 run2 = failed_runs[j]
                 time_diff = abs((run1.end_date - run2.end_date).total_seconds() / 60)
-                
+
                 # Since runs are sorted by end_date, once we exceed the window
                 # all subsequent runs will also be outside the window.
                 if time_diff > window_minutes:
                     break
-                
+
                 if run1.dag_id != run2.dag_id:
                     pair = tuple(sorted([run1.dag_id, run2.dag_id]))
-                    
+
                     if pair in pair_map:
                         pair_map[pair]["co_failure_count"] += 1
-                        pair_map[pair]["last_co_failure"] = max(
-                            run1.end_date, run2.end_date
-                        ).isoformat()
+                        pair_map[pair]["last_co_failure"] = max(run1.end_date, run2.end_date).isoformat()
                     else:
                         pair_map[pair] = {
                             "dag_1": pair[0],
@@ -307,7 +320,7 @@ class DependencyMonitor:
                             "co_failure_count": 1,
                             "last_co_failure": max(run1.end_date, run2.end_date).isoformat(),
                         }
-        
+
         correlations = sorted(pair_map.values(), key=lambda x: x["co_failure_count"], reverse=True)[:20]
 
         return {

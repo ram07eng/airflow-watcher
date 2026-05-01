@@ -1,18 +1,17 @@
 """Task Health Monitor - Tracks long-running tasks, retries, and zombies."""
 
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict
 import logging
-from airflow.utils import timezone
+from datetime import timedelta
+from typing import Dict, List, Optional
 
-from airflow.models import TaskInstance, DagRun
-from airflow.utils.state import TaskInstanceState, DagRunState
+from airflow.models import DagRun, TaskInstance
+from airflow.utils import timezone
 from airflow.utils.session import provide_session
-from sqlalchemy.orm import Session
+from airflow.utils.state import DagRunState, TaskInstanceState
 from sqlalchemy import func, tuple_
+from sqlalchemy.orm import Session
 
 from airflow_watcher.config import WatcherConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -28,41 +27,43 @@ class TaskHealthMonitor:
     def get_long_running_tasks(
         self,
         threshold_minutes: int = 60,
-        session: Session = None,
+        session: Session = None,  # type: ignore[assignment]
     ) -> List[Dict]:
         """Get tasks running longer than the threshold.
-        
+
         Args:
             threshold_minutes: Minutes threshold to flag as long-running
             session: SQLAlchemy session
-            
+
         Returns:
             List of long-running task details
         """
         cutoff_time = timezone.utcnow() - timedelta(minutes=threshold_minutes)
-        
+
         query = session.query(TaskInstance).filter(
             TaskInstance.state == TaskInstanceState.RUNNING,
             TaskInstance.start_date <= cutoff_time,
         )
-        
+
         long_running = []
         current_time = timezone.utcnow()
-        
+
         for ti in query.all():
             running_minutes = (current_time - ti.start_date).total_seconds() / 60
-            
-            long_running.append({
-                "dag_id": ti.dag_id,
-                "task_id": ti.task_id,
-                "run_id": ti.run_id,
-                "execution_date": ti.execution_date.isoformat() if ti.execution_date else None,
-                "start_date": ti.start_date.isoformat() if ti.start_date else None,
-                "running_minutes": round(running_minutes, 2),
-                "operator": ti.operator,
-                "severity": self._get_duration_severity(running_minutes, threshold_minutes),
-            })
-        
+
+            long_running.append(
+                {
+                    "dag_id": ti.dag_id,
+                    "task_id": ti.task_id,
+                    "run_id": ti.run_id,
+                    "execution_date": ti.execution_date.isoformat() if ti.execution_date else None,
+                    "start_date": ti.start_date.isoformat() if ti.start_date else None,
+                    "running_minutes": round(running_minutes, 2),
+                    "operator": ti.operator,
+                    "severity": self._get_duration_severity(running_minutes, threshold_minutes),
+                }
+            )
+
         return sorted(long_running, key=lambda x: x["running_minutes"], reverse=True)
 
     def _get_duration_severity(self, running_minutes: float, threshold: int) -> str:
@@ -81,146 +82,166 @@ class TaskHealthMonitor:
         self,
         lookback_hours: int = 24,
         min_retries: int = 2,
-        session: Session = None,
+        session: Session = None,  # type: ignore[assignment]
     ) -> List[Dict]:
         """Get tasks with excessive retries.
-        
+
         Args:
             lookback_hours: Hours to look back
             min_retries: Minimum retry count to include
             session: SQLAlchemy session
-            
+
         Returns:
             List of tasks with high retry counts
         """
         cutoff_time = timezone.utcnow() - timedelta(hours=lookback_hours)
-        
+
         # Get tasks that have been retried multiple times
-        query = session.query(TaskInstance).filter(
-            TaskInstance.end_date >= cutoff_time,
-            TaskInstance.try_number > min_retries,
-        ).order_by(TaskInstance.try_number.desc())
-        
+        query = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.end_date >= cutoff_time,
+                TaskInstance.try_number > min_retries,
+            )
+            .order_by(TaskInstance.try_number.desc())
+        )
+
         retry_tasks = []
         for ti in query.limit(50).all():
-            retry_tasks.append({
-                "dag_id": ti.dag_id,
-                "task_id": ti.task_id,
-                "run_id": ti.run_id,
-                "try_number": ti.try_number,
-                "max_tries": ti.max_tries,
-                "state": str(ti.state),
-                "operator": ti.operator,
-                "last_attempt": ti.end_date.isoformat() if ti.end_date else None,
-            })
-        
+            retry_tasks.append(
+                {
+                    "dag_id": ti.dag_id,
+                    "task_id": ti.task_id,
+                    "run_id": ti.run_id,
+                    "try_number": ti.try_number,
+                    "max_tries": ti.max_tries,
+                    "state": str(ti.state),
+                    "operator": ti.operator,
+                    "last_attempt": ti.end_date.isoformat() if ti.end_date else None,
+                }
+            )
+
         return retry_tasks
 
     @provide_session
     def get_zombie_tasks(
         self,
         zombie_threshold_minutes: int = 120,
-        session: Session = None,
+        session: Session = None,  # type: ignore[assignment]
     ) -> List[Dict]:
         """Detect potential zombie tasks (running but no heartbeat).
-        
+
         Args:
             zombie_threshold_minutes: Minutes without update to consider zombie
             session: SQLAlchemy session
-            
+
         Returns:
             List of potential zombie tasks
         """
         cutoff_time = timezone.utcnow() - timedelta(minutes=zombie_threshold_minutes)
-        
+
         # Tasks marked as running but not updated recently
         query = session.query(TaskInstance).filter(
             TaskInstance.state == TaskInstanceState.RUNNING,
             TaskInstance.start_date <= cutoff_time,
         )
-        
+
         running_tasks = query.all()
         current_time = timezone.utcnow()
-        
+
         # Batch-load DagRuns to avoid N+1 queries
         dag_run_map: Dict = {}
         if running_tasks:
             dag_run_keys = list({(ti.dag_id, ti.run_id) for ti in running_tasks})
-            dag_runs = session.query(DagRun).filter(
-                tuple_(DagRun.dag_id, DagRun.run_id).in_(dag_run_keys)
-            ).all()
+            dag_runs = session.query(DagRun).filter(tuple_(DagRun.dag_id, DagRun.run_id).in_(dag_run_keys)).all()
             dag_run_map = {(dr.dag_id, dr.run_id): dr for dr in dag_runs}
-        
+
         zombies = []
         for ti in running_tasks:
             dag_run = dag_run_map.get((ti.dag_id, ti.run_id))
-            
+
             # If DAG run is not running but task is, it's likely a zombie
             is_orphaned = dag_run and dag_run.state != DagRunState.RUNNING
-            
+
             running_minutes = (current_time - ti.start_date).total_seconds() / 60
-            
-            zombies.append({
-                "dag_id": ti.dag_id,
-                "task_id": ti.task_id,
-                "run_id": ti.run_id,
-                "start_date": ti.start_date.isoformat() if ti.start_date else None,
-                "running_minutes": round(running_minutes, 2),
-                "is_orphaned": is_orphaned,
-                "dag_run_state": str(dag_run.state) if dag_run else "unknown",
-                "operator": ti.operator,
-            })
-        
+
+            zombies.append(
+                {
+                    "dag_id": ti.dag_id,
+                    "task_id": ti.task_id,
+                    "run_id": ti.run_id,
+                    "start_date": ti.start_date.isoformat() if ti.start_date else None,
+                    "running_minutes": round(running_minutes, 2),
+                    "is_orphaned": is_orphaned,
+                    "dag_run_state": str(dag_run.state) if dag_run else "unknown",
+                    "operator": ti.operator,
+                }
+            )
+
         return zombies
 
     @provide_session
     def get_task_failure_patterns(
         self,
         lookback_hours: int = 168,  # 7 days
-        session: Session = None,
+        session: Session = None,  # type: ignore[assignment]
     ) -> Dict:
         """Analyze task failure patterns to identify problematic tasks.
-        
+
         Args:
             lookback_hours: Hours to analyze
             session: SQLAlchemy session
-            
+
         Returns:
             Dictionary with failure pattern analysis
         """
         cutoff_time = timezone.utcnow() - timedelta(hours=lookback_hours)
-        
+
         # Get failure counts by task
-        failure_counts = session.query(
-            TaskInstance.dag_id,
-            TaskInstance.task_id,
-            func.count(TaskInstance.task_id).label("failure_count"),
-        ).filter(
-            TaskInstance.state == TaskInstanceState.FAILED,
-            TaskInstance.end_date >= cutoff_time,
-        ).group_by(
-            TaskInstance.dag_id,
-            TaskInstance.task_id,
-        ).order_by(
-            func.count(TaskInstance.task_id).desc()
-        ).limit(20).all()
-        
+        failure_counts = (
+            session.query(
+                TaskInstance.dag_id,
+                TaskInstance.task_id,
+                func.count(TaskInstance.task_id).label("failure_count"),
+            )
+            .filter(
+                TaskInstance.state == TaskInstanceState.FAILED,
+                TaskInstance.end_date >= cutoff_time,
+            )
+            .group_by(
+                TaskInstance.dag_id,
+                TaskInstance.task_id,
+            )
+            .order_by(func.count(TaskInstance.task_id).desc())
+            .limit(20)
+            .all()
+        )
+
         # Get total task runs for failure rate calculation
-        total_runs = session.query(TaskInstance).filter(
-            TaskInstance.end_date >= cutoff_time,
-        ).count()
-        
-        total_failures = session.query(TaskInstance).filter(
-            TaskInstance.state == TaskInstanceState.FAILED,
-            TaskInstance.end_date >= cutoff_time,
-        ).count()
-        
+        total_runs = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.end_date >= cutoff_time,
+            )
+            .count()
+        )
+
+        total_failures = (
+            session.query(TaskInstance)
+            .filter(
+                TaskInstance.state == TaskInstanceState.FAILED,
+                TaskInstance.end_date >= cutoff_time,
+            )
+            .count()
+        )
+
         # Identify flaky tasks (high failure + high retry success).
         # Batch-query all retry-successes for top-10 tasks in a single query.
         flaky_tasks = []
         top_tasks = failure_counts[:10]
         if top_tasks:
-            from sqlalchemy import or_, and_
+            from sqlalchemy import and_, or_
+
             conditions = [
                 and_(
                     TaskInstance.dag_id == dag_id,
@@ -228,41 +249,47 @@ class TaskHealthMonitor:
                 )
                 for dag_id, task_id, _ in top_tasks
             ]
-            retry_successes = session.query(
-                TaskInstance.dag_id,
-                TaskInstance.task_id,
-                func.count().label("success_count"),
-            ).filter(
-                or_(*conditions),
-                TaskInstance.state == TaskInstanceState.SUCCESS,
-                TaskInstance.try_number > 1,
-                TaskInstance.end_date >= cutoff_time,
-            ).group_by(
-                TaskInstance.dag_id,
-                TaskInstance.task_id,
-            ).all()
+            retry_successes = (
+                session.query(
+                    TaskInstance.dag_id,
+                    TaskInstance.task_id,
+                    func.count().label("success_count"),
+                )
+                .filter(
+                    or_(*conditions),
+                    TaskInstance.state == TaskInstanceState.SUCCESS,
+                    TaskInstance.try_number > 1,
+                    TaskInstance.end_date >= cutoff_time,
+                )
+                .group_by(
+                    TaskInstance.dag_id,
+                    TaskInstance.task_id,
+                )
+                .all()
+            )
             success_map = {(r.dag_id, r.task_id): r.success_count for r in retry_successes}
 
             for dag_id, task_id, failure_count in top_tasks:
                 success_after_retry = success_map.get((dag_id, task_id), 0)
                 if success_after_retry > 0:
-                    flaky_tasks.append({
-                        "dag_id": dag_id,
-                        "task_id": task_id,
-                        "failure_count": failure_count,
-                        "retry_success_count": success_after_retry,
-                        "flakiness_score": round(success_after_retry / (failure_count + success_after_retry) * 100, 2),
-                    })
-        
+                    flaky_tasks.append(
+                        {
+                            "dag_id": dag_id,
+                            "task_id": task_id,
+                            "failure_count": failure_count,
+                            "retry_success_count": success_after_retry,
+                            "flakiness_score": round(
+                                success_after_retry / (failure_count + success_after_retry) * 100, 2
+                            ),
+                        }
+                    )
+
         return {
             "period_hours": lookback_hours,
             "total_task_runs": total_runs,
             "total_failures": total_failures,
             "failure_rate": round(total_failures / total_runs * 100, 2) if total_runs > 0 else 0,
-            "top_failing_tasks": [
-                {"dag_id": d, "task_id": t, "failure_count": c}
-                for d, t, c in failure_counts
-            ],
+            "top_failing_tasks": [{"dag_id": d, "task_id": t, "failure_count": c} for d, t, c in failure_counts],
             "flaky_tasks": flaky_tasks,
             "timestamp": timezone.utcnow().isoformat(),
         }

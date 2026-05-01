@@ -56,6 +56,10 @@ all = [
     "requests>=2.28.0",
     "slack-sdk>=3.19.0",
     "prometheus-client>=0.15.0",
+    "google-cloud-bigquery>=3.0.0",
+]
+bigquery = [
+    "google-cloud-bigquery>=3.0.0",
 ]
 standalone = [
     "fastapi>=0.104.0",

@@ -8,12 +8,20 @@
 
 An Airflow plugin and standalone REST API for monitoring DAG failures, SLA misses, task health, and scheduling delays — with built-in alerting via Slack, Email, and PagerDuty.
 
-Airflow Watcher ships two independent components that share the same monitors, notifiers, and metrics layer:
+Airflow Watcher ships two independent components that share the same monitors, notifiers, metrics layer, and **pluggable backend system**:
 
 | Component | Runs in | Auth | Use case |
 |-----------|---------|------|----------|
 | **[Plugin](#plugin-airflow-ui)** | Airflow webserver process | Airflow session cookies + FAB RBAC | UI dashboards, internal API at `/api/watcher` |
 | **[Standalone API](#standalone-api-fastapi)** | Separate FastAPI process | Bearer token + per-key RBAC | External integrations, CI/CD, dashboards, automation |
+
+Both components support three **data backends** controlled by a single env var:
+
+| `AIRFLOW_WATCHER_BACKEND` | Data source |
+|---------------------------|-------------|
+| `airflow` _(default)_ | Airflow metadata DB (Postgres / MySQL / SQLite via Airflow ORM) |
+| `bigquery` | External BigQuery table (e.g. dbt callback results) |
+| `sqlalchemy` | Any SQLAlchemy-compatible DB with a flat results table |
 
 ## Table of Contents
 
@@ -25,6 +33,7 @@ Airflow Watcher ships two independent components that share the same monitors, n
   - [Architecture](#plugin-architecture)
   - [UI Views](#ui-views)
   - [RBAC](#plugin-rbac)
+  - [Backend Configuration](#plugin-backend-configuration)
   - [API Endpoints — `/api/watcher`](#plugin-api-endpoints--apiwatcher)
   - [Demo Environment](#demo-environment)
 - **Standalone API**
@@ -32,7 +41,8 @@ Airflow Watcher ships two independent components that share the same monitors, n
   - [Architecture](#api-architecture)
   - [Quick Start](#quick-start)
   - [Authentication & Configuration](#authentication--configuration)
-  - [API Endpoints — `/api/v1`](#api-endpoints)
+  - [BigQuery Backend](#bigquery-backend)
+  - [SQLAlchemy Backend](#sqlalchemy-backend)
   - [RBAC, Request Flow & Integration Examples](#api-rbac-request-flow--integration-examples)
 - **Common**
   - [Plugin vs API Comparison](#plugin-vs-api-comparison)
@@ -108,7 +118,9 @@ export AIRFLOW_WATCHER_ALERT_TEMPLATE="production_balanced"
 
 # Plugin (Airflow UI)
 
-The plugin runs **inside** the Airflow webserver process. Once installed, it auto-registers with Airflow, adds a "Watcher" menu to the UI, and exposes REST endpoints at `/api/watcher/*`. No separate workers, message queues, or external databases are needed — it reads from the same metadata DB that Airflow already maintains.
+The plugin runs **inside** the Airflow webserver process. Once installed, it auto-registers with Airflow, adds a "Watcher" menu to the UI, and exposes REST endpoints at `/api/watcher/*`.
+
+By default the plugin reads from **Airflow's own metadata DB** — no extra configuration needed. Set `AIRFLOW_WATCHER_BACKEND=bigquery` (or `sqlalchemy`) in your Airflow environment to switch every plugin endpoint to an external data source instead.
 
 ## Demo
 
@@ -125,34 +137,28 @@ The plugin runs **inside** the Airflow webserver process. Once installed, it aut
 |  |              Airflow Watcher Plugin                    |  |
 |  |                                                        |  |
 |  |  +-------------+     +------------------------------+  |  |
-|  |  | Flask Views  |    |        Monitors (6)          |  |  |
-|  |  | (Dashboard)  |<---|  - DAG Failure Monitor       |  |  |
-|  |  |              |    |  - SLA Monitor               |  |  |
-|  |  | REST API     |    |  - Task Health Monitor       |  |  |
-|  |  | /api/watcher |    |  - Scheduling Monitor        |  |  |
-|  |  +-------------+     |  - Dependency Monitor        |  |  |
-|  |         |            |  - DAG Health Monitor        |  |  |
-|  |         |            +----------+-------------------+  |  |
-|  |         |                      |                       |  |
-|  |         |           +----------v-------------------+   |  |
-|  |         |           |    Metrics Collector          |  |  |
-|  |         |           |    (WatcherMetrics)           |  |  |
-|  |         |           +----------+-------------------+   |  |
-|  |         |                      |                       |  |
-|  |         v                      v                       |  |
-|  |  +-------------+     +------------------------------+  |  |
-|  |  |  Notifiers   |    |        Emitters              |  |  |
-|  |  |  - Slack     |    |  - StatsD / Datadog (UDP)    |  |  |
-|  |  |  - Email     |    |  - Prometheus (/metrics)     |  |  |
-|  |  |  - PagerDuty |    |                              |  |  |
-|  |  +-------------+     +------------------------------+  |  |
-|  +--------------------------------------------------------+  |
-|                          |                                   |
-|                          v                                   |
-|              +-----------------------+                       |
-|              |  Airflow Metadata DB  |                       |
-|              |  (PostgreSQL/MySQL)   |                       |
-|              +-----------------------+                       |
+|  |  | Flask Views  |    |     monitor_provider         |  |  |
+|  |  | (Dashboard)  |<---|  routes based on BACKEND env |  |  |
+|  |  |              |    +----------+-------------------+  |  |
+|  |  | REST API     |              |                       |  |
+|  |  | /api/watcher |    +---------+----------+            |  |
+|  |  +-------------+     |         |          |            |  |
+|  |                       ▼         ▼          ▼            |  |
+|  |              +--------+  +------+--+  +--------+       |  |
+|  |              | Airflow|  |BigQuery |  |  SQL   |       |  |
+|  |              |  ORM   |  | Client  |  | Client |       |  |
+|  |              |(default|  |(BQ table|  |(any DB)|       |  |
+|  |              +---+----+  +----+----+  +---+----+       |  |
+|  |                  |            |           |             |  |
+|  +------------------+-----------+-----------+-------------+  |
+|                     |           |           |                 |
+|          +----------+     +-----+   +-------+                 |
+|          ▼                ▼         ▼                         |
+|  +--------------+  +----------+  +----------+                 |
+|  | Airflow DB   |  | BigQuery |  | Postgres |                 |
+|  | (meta DB)    |  |  Table   |  | MySQL    |                 |
+|  +--------------+  +----------+  | SQLite   |                 |
+|                                  +----------+                 |
 +--------------------------------------------------------------+
 ```
 
@@ -325,6 +331,39 @@ See [demo/README.md](demo/README.md) for more details.
 
 </details>
 
+<details>
+<summary><h2>Plugin Backend Configuration</h2></summary>
+
+By default the plugin reads from Airflow's metadata DB. Set `AIRFLOW_WATCHER_BACKEND` in the Airflow webserver environment to switch to an external source — no code changes, no redeploy of the plugin itself.
+
+### BigQuery backend
+
+```bash
+# In docker-compose.yml, airflow.cfg, or MWAA/Composer env vars:
+AIRFLOW_WATCHER_BACKEND=bigquery
+AIRFLOW_WATCHER_BQ_TABLE=project.dataset.table
+# Optional: override column names if your table differs from the dbt-callback default
+# AIRFLOW_WATCHER_SCHEMA_JSON='{"col_dag_id":"pipeline_id","col_elapsed_time":"duration_seconds"}'
+```
+
+Authentication uses Application Default Credentials (Workload Identity on GKE/Composer, service account key otherwise).
+
+### SQLAlchemy backend
+
+```bash
+AIRFLOW_WATCHER_BACKEND=sqlalchemy
+AIRFLOW_WATCHER_BQ_TABLE=my_results_table      # flat table name (no project/dataset prefix)
+AIRFLOW_WATCHER_EXTERNAL_DB_URI=postgresql://user:pass@host/db
+# Optional column overrides:
+# AIRFLOW_WATCHER_SCHEMA_JSON='{"col_dag_id":"pipeline_id"}'
+```
+
+### Feature availability per backend
+
+See the [Feature matrix](#feature-matrix) in the BigQuery Backend section below. The same matrix applies when the backends are used via the plugin.
+
+</details>
+
 ---
 
 # Standalone API (FastAPI)
@@ -409,6 +448,21 @@ When running locally, the same docs are available at **http://localhost:8081/doc
 ## Authentication & Configuration
 
 📖 **See [INSTALL.md](INSTALL.md#api-authentication) for full authentication, configuration, and RBAC setup.**
+
+Key environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AIRFLOW_WATCHER_DB_URI` | _(required for `airflow` backend)_ | Airflow metadata DB connection string |
+| `AIRFLOW_WATCHER_API_KEYS` | _(none)_ | Comma-separated Bearer tokens; omit to disable auth |
+| `AIRFLOW_WATCHER_BACKEND` | `airflow` | Data source: `airflow` (metadata DB), `bigquery`, or `sqlalchemy` |
+| `AIRFLOW_WATCHER_BQ_TABLE` | _(none)_ | Required for `bigquery`/`sqlalchemy` — table name (`project.dataset.table` for BQ, plain table name for SQL) |
+| `AIRFLOW_WATCHER_EXTERNAL_DB_URI` | _(none)_ | Required for `sqlalchemy` backend — SQLAlchemy connection string |
+| `AIRFLOW_WATCHER_SCHEMA_JSON` | _(none)_ | JSON object overriding column names for external backends |
+| `AIRFLOW_WATCHER_RBAC_ENABLED` | `false` | Enable per-key DAG filtering |
+| `AIRFLOW_WATCHER_CACHE_TTL` | `60` | Response cache TTL in seconds |
+
+See the [BigQuery Backend](#bigquery-backend) section for BQ-specific setup.
 
 <details>
 <summary><h2>API Endpoints</h2></summary>
@@ -684,6 +738,105 @@ console.log(`Health: ${data.dag_summary.health_score}`);
 
 </details>
 
+## BigQuery Backend
+
+Airflow Watcher can read dbt run results from BigQuery instead of the Airflow metadata DB.
+This is useful when:
+- The Airflow DB is not reachable from the monitoring host
+- You already ingest dbt callback data into BigQuery (e.g. via the dbt callback plugin)
+- You want a read-only monitoring API with no DB access
+
+Works in **both the plugin and the standalone API** — same env vars, same behaviour.
+
+### Install
+
+```bash
+pip install "airflow-watcher[bigquery]"
+# or include alongside standalone:
+pip install "airflow-watcher[standalone,bigquery]"
+```
+
+### Configure
+
+```bash
+export AIRFLOW_WATCHER_BACKEND=bigquery
+export AIRFLOW_WATCHER_BQ_TABLE=project.dataset.table
+# DB_URI is NOT required in BigQuery mode
+export AIRFLOW_WATCHER_API_KEYS=your-secret-key   # standalone only
+```
+
+Override individual column names when your table schema differs from the dbt-callback default:
+
+```bash
+export AIRFLOW_WATCHER_SCHEMA_JSON='{"col_dag_id":"pipeline_id","col_elapsed_time":"duration_seconds","col_state":"run_state"}'
+```
+
+Authentication uses Application Default Credentials (`gcloud auth application-default login` or a service account).
+
+### Start
+
+```bash
+# Standalone API
+python src/airflow_watcher/api/main.py
+
+# Plugin — set env vars in your Airflow webserver environment
+# (docker-compose.yml, airflow.cfg, MWAA/Composer env vars, etc.)
+```
+
+### Feature matrix
+
+| Feature | Airflow backend | BigQuery backend |
+|---------|----------------|-----------------|
+| Recent failures | Full (DB) | dbt model errors from BQ |
+| Failure statistics | Full | Full |
+| Scheduling lag | Full | Derived from dbt timing |
+| Long-running tasks | Full | dbt invocation elapsed time |
+| Stale / inactive DAGs | Full | Derived from BQ dag overview |
+| DAG health summary | Full | Derived from BQ dag overview |
+| Failure correlations | Full | Full (co-occurrence in BQ) |
+| Cost analysis (GB billed) | Not available | Full (`adapter_response` metadata) |
+| SLA misses | Full | Not available (`backend_note` returned) |
+| Retry counts | Full | Not available |
+| Zombie tasks | Full | Not available (no heartbeat in BQ) |
+| Worker pool utilization | Full | Not available |
+| Live queue depth | Full | Not available |
+| DAG import errors | Full | Not available |
+| Cross-DAG dependency graph | Full (DagBag) | Not available |
+| Cascading failure impact | Full (DagBag) | Not available |
+
+Endpoints backed by unavailable data return empty results with a `backend_note` field — they do not error.
+
+---
+
+## SQLAlchemy Backend
+
+Read monitoring data from any flat table on a SQLAlchemy-compatible database (PostgreSQL, MySQL, SQLite). Useful when dbt results are written to a relational DB rather than BigQuery.
+
+Works in **both the plugin and the standalone API**.
+
+### Install
+
+```bash
+pip install "airflow-watcher[standalone]"   # SQLAlchemy is included
+```
+
+### Configure
+
+```bash
+export AIRFLOW_WATCHER_BACKEND=sqlalchemy
+export AIRFLOW_WATCHER_EXTERNAL_DB_URI=postgresql://user:pass@host/db
+export AIRFLOW_WATCHER_BQ_TABLE=my_results_table   # flat table name
+# Optional column overrides:
+# export AIRFLOW_WATCHER_SCHEMA_JSON='{"col_dag_id":"pipeline_id"}'
+export AIRFLOW_WATCHER_API_KEYS=your-secret-key     # standalone only
+```
+
+The table must be a flat structure (one row per task/model run). Default column names match the dbt-callback schema; override any with `AIRFLOW_WATCHER_SCHEMA_JSON`.
+
+### Feature availability
+
+Same as the BigQuery feature matrix above, minus BigQuery-specific cost fields (`bytes_billed`, `slot_ms`). SLA misses, retries, zombies, queue/pool data, and import errors are not available — these live only in Airflow's metadata DB.
+
 ---
 
 # Common
@@ -699,6 +852,7 @@ console.log(`Health: ${data.dag_summary.health_score}`);
 | **Port** | Same as Airflow (default 8080) | Separate (default 8081) |
 | **UI** | 7 dashboard pages | Swagger UI at `/docs` |
 | **Caching** | No built-in cache | TTL-based response cache |
+| **Backend support** | `airflow` / `bigquery` / `sqlalchemy` | `airflow` / `bigquery` / `sqlalchemy` |
 | **Liveness probe** | `/api/watcher/health` | `/healthz` (no auth) |
 | **Best for** | Airflow operators using the UI | External tools, CI/CD, dashboards |
 

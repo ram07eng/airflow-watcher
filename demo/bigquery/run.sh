@@ -2,19 +2,19 @@
 # Launch the BigQuery proof-of-concept API.
 #
 # Usage:
-#   ./run.sh                   # defaults
-#   BQ_TABLE=my-project.dataset.table PORT=9000 ./run.sh
+#   ./run.sh                                        # use defaults
+#   AIRFLOW_WATCHER_BQ_TABLE=my-project.ds.t PORT=9000 ./run.sh
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
 
-export BQ_TABLE="${BQ_TABLE:-just-data.production_je_monitoring.morpheusdbtresult_all_2026}"
+export AIRFLOW_WATCHER_BQ_TABLE="${AIRFLOW_WATCHER_BQ_TABLE:-just-data.production_je_monitoring.morpheusdbtresult_all_2026}"
 export PORT="${PORT:-8090}"
 
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║  Airflow Watcher — BigQuery PoC                            ║"
 echo "╠══════════════════════════════════════════════════════════════╣"
-echo "║  Table : ${BQ_TABLE}"
+echo "║  Table : ${AIRFLOW_WATCHER_BQ_TABLE}"
 echo "║  Port  : ${PORT}"
 echo "║  Docs  : http://localhost:${PORT}/docs"
 echo "╚══════════════════════════════════════════════════════════════╝"
