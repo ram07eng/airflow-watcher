@@ -101,7 +101,9 @@ def _make_bigquery_backend(config) -> object:
             "Set it to the fully-qualified table name:  project.dataset.table"
         )
 
-    structure = str(getattr(config, "bq_structure", None) or os.environ.get("AIRFLOW_WATCHER_BQ_STRUCTURE", "nested_array"))
+    structure = str(
+        getattr(config, "bq_structure", None) or os.environ.get("AIRFLOW_WATCHER_BQ_STRUCTURE", "nested_array")
+    )
     schema = _build_schema(config, dialect="bigquery", structure=structure)
     schema.table = bq_table  # ensure table is set
 

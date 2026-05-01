@@ -12,18 +12,16 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse
-
-import sys
-from pathlib import Path
 
 # Allow running standalone — ensure bq_client is importable
 _here = Path(__file__).resolve().parent
@@ -31,6 +29,7 @@ if str(_here) not in sys.path:
     sys.path.insert(0, str(_here))
 
 from bq_client import BQClient  # noqa: E402
+
 from airflow_watcher.backends.schema_config import SchemaConfig  # noqa: E402
 
 logger = logging.getLogger(__name__)

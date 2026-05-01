@@ -15,7 +15,7 @@ ARRAY schemas require BigQuery.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from airflow_watcher.backends.schema_config import SchemaConfig
@@ -45,7 +45,8 @@ class SQLClient:
                 "Use BQClient for nested_array tables."
             )
         try:
-            from sqlalchemy import create_engine, text as sa_text
+            from sqlalchemy import create_engine
+            from sqlalchemy import text as sa_text
 
             self._text = sa_text
         except ImportError as exc:

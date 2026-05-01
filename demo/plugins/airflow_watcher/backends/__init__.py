@@ -90,8 +90,8 @@ def _build_schema(config, dialect: str, structure: str):
 
 def _make_bigquery_backend(config):
     """Instantiate ExternalBackend backed by BQClient."""
-    from airflow_watcher.backends.bigquery_backend import ExternalBackend
     from airflow_watcher.backends._bq_client import BQClient
+    from airflow_watcher.backends.bigquery_backend import ExternalBackend
 
     bq_table = getattr(config, "bq_table", None)
     if not bq_table:
@@ -111,8 +111,8 @@ def _make_bigquery_backend(config):
 
 def _make_sqlalchemy_backend(config):
     """Instantiate ExternalBackend backed by SQLClient."""
-    from airflow_watcher.backends.bigquery_backend import ExternalBackend
     from airflow_watcher.backends._sql_client import SQLClient
+    from airflow_watcher.backends.bigquery_backend import ExternalBackend
 
     db_uri = getattr(config, "external_db_uri", None) or os.environ.get("AIRFLOW_WATCHER_EXTERNAL_DB_URI", "")
     if not db_uri:

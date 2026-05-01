@@ -76,11 +76,11 @@ class StandaloneConfig:
     alert_template: str = "production_balanced"
 
     # --- Backend settings ---
-    backend: str = "airflow"       # "airflow" | "bigquery" | "sqlalchemy"
-    bq_table: Optional[str] = None           # table name for bigquery + sqlalchemy backends
-    bq_structure: str = "nested_array"       # "nested_array" | "flat" (bigquery backend only)
-    external_db_uri: Optional[str] = None    # SQLAlchemy URI for sqlalchemy backend
-    schema_json: Optional[str] = None        # JSON column-override for external backends
+    backend: str = "airflow"  # "airflow" | "bigquery" | "sqlalchemy"
+    bq_table: Optional[str] = None  # table name for bigquery + sqlalchemy backends
+    bq_structure: str = "nested_array"  # "nested_array" | "flat" (bigquery backend only)
+    external_db_uri: Optional[str] = None  # SQLAlchemy URI for sqlalchemy backend
+    schema_json: Optional[str] = None  # JSON column-override for external backends
 
     @classmethod
     def from_env(cls) -> "StandaloneConfig":
